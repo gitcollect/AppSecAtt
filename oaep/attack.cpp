@@ -81,18 +81,16 @@ void attack(char* argv2)
 	ifstream config (argv2, ifstream::in);
 	mpz_class N, e, l_prime, c_prime;
 	config >> hex >> N >> e >> l_prime >> c_prime;
-
-	// cout << hex << uppercase << N << "\n" << 
-	// 							e << "\n" << 
-	// 							l_prime << "\n" << 
-	// 							c_prime << "\n";
+	size_t sizeN = mpz_size(N.get_mpz_t());
+	cout << sizeN * mp_bits_per_limb / 8 << "\n"; 
 
 	// work with 61061.D
 	mpz_class d;
 	int code;
 	gmp_fprintf(target_in, "%ZX\n%ZX\n", l_prime.get_mpz_t(), c_prime.get_mpz_t());
 	fflush(target_in);
-	fscanf(target_out, "%X\n", code);
+	fscanf(target_out, "%X", &code);
+	cout << code << "\n";
 }
 
 
