@@ -11,7 +11,7 @@ int attack_raw[2];   // unbuffered communication: attack target -> attacker
 FILE* target_out = NULL; // buffered attack target input  stream
 FILE* target_in  = NULL; // buffered attack target output stream
 
-void attack();
+void attack(char* argv2);
 void cleanup(int s);
 
 int main(int argc, char* argv[])
@@ -62,7 +62,7 @@ int main(int argc, char* argv[])
 				abort();
 
 			// Execute a function representing the attacker.
-			attack();
+			attack(argv[2]);
 
 			// Break and clean-up once finished.
 			break;
@@ -75,12 +75,24 @@ int main(int argc, char* argv[])
 	return 0;
 }
 
-void attack()
+void attack(char* argv2)
 {
-	ifstream config ("61061.conf", ifstream::in);
+	// work with 61061.conf
+	ifstream config (argv2, ifstream::in);
 	mpz_class N, e, l_prime, c_prime;
 	config >> hex >> N >> e >> l_prime >> c_prime;
-	cout << hex << uppercase << N << "\n" << e << "\n" << l_prime << "\n" << c_prime << "\n";
+
+	// cout << hex << uppercase << N << "\n" << 
+	// 							e << "\n" << 
+	// 							l_prime << "\n" << 
+	// 							c_prime << "\n";
+
+	// work with 61061.D
+	mpz_class d;
+	int code;
+	gmp_fprintf(target_in, "%ZX\n%ZX\n", l_prime.get_mpz_t(), c_prime.get_mpz_t());
+	fflush(target_in);
+	fscanf(target_out, "%X\n", code);
 }
 
 
