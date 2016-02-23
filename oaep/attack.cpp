@@ -79,8 +79,12 @@ int main(int argc, char* argv[])
 int interact(mpz_class l_prime, mpz_class c_prime)
 {
     // interact with 61061.D
-	gmp_fprintf(target_in, "%ZX\n%ZX\n", l_prime.get_mpz_t(), c_prime.get_mpz_t());
+	gmp_fprintf(target_in, "%ZX\n%0256ZX\n", l_prime.get_mpz_t(), c_prime.get_mpz_t());
 	fflush(target_in);
+    
+    //       code 0: decryption success 
+    // error code 1: y >= B
+    // error code 2: y < B (?)
     
     // Print error code
 	int code;
@@ -91,20 +95,76 @@ int interact(mpz_class l_prime, mpz_class c_prime)
 
 void attack(char* argv2)
 {
-	// work with 61061.conf
+	// interact with 61061.conf
     // reading the input
 	ifstream config (argv2, ifstream::in);
 	mpz_class N, e, l_prime, c_prime;
 	config >> hex >> N >> e >> l_prime >> c_prime;
     
-    // print n
-	size_t sizeN = mpz_size(N.get_mpz_t());
-	cout << "size of N in bytes: " << sizeN * mp_bits_per_limb / 8 << "\n";
+    // print k = ceil(log 256 (N))
+	//size_t sizeN = mpz_size(N.get_mpz_t());
+    size_t k = mpz_size(N.get_mpz_t()) * mp_bits_per_limb / 8;
+	cout << "size of N in bytes: " << k << "\n";
+    // print B = 2^(8*(k-1)) (mod N)
+    // !!! assuming 2*B < N !!!
+    mpz_class B;
+    mpz_powm_ui(B.get_mpz_t(), mpz_class(2).get_mpz_t(), 8*(k - 1), N.get_mpz_t());
+    cout << "B = " << B << "\n";
     
-    // attack go here //
-    int code = interact(l_prime, c_prime);
+    //////////////////////////////////////////////////////////////////////
+    // ATTACK                                                           //
+    //////////////////////////////////////////////////////////////////////
+    
+    //////////////////////////////////////////////////////////////////////
+    // STEP 1.
+    int code = -1, i = 1;
+    mpz_class f_1;
+    mpz_class f_1_exp;
+    mpz_class c_1; // c_1 = f_1 * c' (mod N)
 
-	mpz_class d;
+    while (code != 1) 
+    {
+        cout << "STEP 1\n";
+        mpz_ui_pow_ui(f_1.get_mpz_t(), 2, i);
+        mpz_powm(f_1_exp.get_mpz_t(), f_1.get_mpz_t(), e.get_mpz_t(), N.get_mpz_t());
+        c_1 = f_1 * c_prime % N;
+        code = interact(l_prime, c_1);
+        i++;
+    }
+    
+    cout << "f_1 c [B/2, 2*B) = " << f_1 << "\n";
+    
+    
+    //////////////////////////////////////////////////////////////////////
+    // STEP 2.
+    
+    // f_2 = 2*B/f_1
+	mpz_class f_2 = (N + B) / B * f_1 / 2;
+    cout << "f_2 = " << f_2 << "\n";
+    mpz_class f_2_exp;
+    mpz_class c_2;
+    code = -1;
+    
+    while (true)
+    {
+        mpz_powm(f_2_exp.get_mpz_t(), f_2.get_mpz_t(), e.get_mpz_t(), N.get_mpz_t());
+        cout << "f_2_exp = " << f_2_exp << endl;
+        c_2 = f_2_exp * c_prime % N;
+        cout << "c_2 = " << c_2 << endl;
+        
+        
+        code = interact(l_prime, c_2);
+        
+        if (code != 1)
+            break;
+        
+        f_2 += f_1/2;
+    }
+    
+    cout << "f_2 = " << f_2 << "\n";
+    
+    //////////////////////////////////////////////////////////////////////
+    // STEP 3.
     
 }
 
