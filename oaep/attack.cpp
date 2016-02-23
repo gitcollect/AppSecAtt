@@ -166,6 +166,41 @@ void attack(char* argv2)
     //////////////////////////////////////////////////////////////////////
     // STEP 3.
     
+    // m_min = ceil( n / f_2 )
+    mpz_class m_min = (N + f_2 - 1)/f_2;
+    //cout << "m_min = " << m_min << endl;
+    // m_max = floor( (n + B) / f_2 )
+    mpz_class m_max = (N + B)/f_2;
+    //cout << "m_max = " << m_max << endl;
+    
+    mpz_class f_3, f_3_exp, c_3, f_tmp;
+    mpz_class i_bound;
+    
+    while(m_min != m_max)
+    {
+        f_tmp = 2*B / (m_max - m_min);
+        cout << "f_tmp = " << f_tmp << "\n";
+        
+        i_bound = f_tmp * m_min / N;
+        f_3 = (i_bound * N + m_min - 1) / m_min;
+        
+        mpz_powm(f_3_exp.get_mpz_t(), f_3.get_mpz_t(), e.get_mpz_t(), N.get_mpz_t());
+        c_3 = f_3_exp * c_prime % N;
+        
+        code = interact(l_prime, c_3);
+        
+        if (code == 1)
+            m_min = (i_bound * N + B + f_3 - 1) / f_3;
+        else if (code == 2)
+            m_max = (i_bound * N + B) / f_3;
+       
+    }
+    
+    mpz_class c_check;
+    mpz_powm(c_check.get_mpz_t(), m_max.get_mpz_t(), e.get_mpz_t(), N.get_mpz_t());
+    
+    if (c_check == c_prime)
+        cout << "MOO WINS!!!" << endl;
 }
 
 
