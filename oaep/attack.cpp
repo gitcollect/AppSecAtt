@@ -76,7 +76,7 @@ int main(int argc, char* argv[])
 }
 
 
-int interact(mpz_class l_prime, mpz_class c_prime)
+int interact(const mpz_class &l_prime, const mpz_class &c_prime)
 {
     // interact with 61061.D
 	gmp_fprintf(target_in, "%ZX\n%0256ZX\n", l_prime.get_mpz_t(), c_prime.get_mpz_t());
@@ -89,7 +89,7 @@ int interact(mpz_class l_prime, mpz_class c_prime)
     // Print error code
 	int code;
 	fscanf(target_out, "%X", &code);
-	cout << "Error code: " << code << "\n";
+	//cout << "Error code: " << code << "\n";
     return code;
 }
 
@@ -104,12 +104,12 @@ void attack(char* argv2)
     // print k = ceil(log 256 (N))
 	//size_t sizeN = mpz_size(N.get_mpz_t());
     size_t k = mpz_size(N.get_mpz_t()) * mp_bits_per_limb / 8;
-	cout << "size of N in bytes: " << k << "\n";
+	//cout << "size of N in bytes: " << k << "\n";
     // print B = 2^(8*(k-1)) (mod N)
     // !!! assuming 2*B < N !!!
     mpz_class B;
     mpz_powm_ui(B.get_mpz_t(), mpz_class(2).get_mpz_t(), 8*(k - 1), N.get_mpz_t());
-    cout << "B = " << B << "\n";
+    //cout << "B = " << B << "\n";
     
     //////////////////////////////////////////////////////////////////////
     // ATTACK                                                           //
@@ -124,7 +124,6 @@ void attack(char* argv2)
 
     while (code != 1) 
     {
-        cout << "STEP 1\n";
         mpz_ui_pow_ui(f_1.get_mpz_t(), 2, i);
         mpz_powm(f_1_exp.get_mpz_t(), f_1.get_mpz_t(), e.get_mpz_t(), N.get_mpz_t());
         c_1 = f_1 * c_prime % N;
@@ -132,7 +131,7 @@ void attack(char* argv2)
         i++;
     }
     
-    cout << "f_1 c [B/2, 2*B) = " << f_1 << "\n";
+    //cout << "f_1 c [B/2, 2*B) = " << f_1 << "\n";
     
     
     //////////////////////////////////////////////////////////////////////
@@ -140,7 +139,7 @@ void attack(char* argv2)
     
     // f_2 = 2*B/f_1
 	mpz_class f_2 = (N + B) / B * f_1 / 2;
-    cout << "f_2 = " << f_2 << "\n";
+    //cout << "f_2 = " << f_2 << "\n";
     mpz_class f_2_exp;
     mpz_class c_2;
     code = -1;
@@ -148,11 +147,7 @@ void attack(char* argv2)
     while (true)
     {
         mpz_powm(f_2_exp.get_mpz_t(), f_2.get_mpz_t(), e.get_mpz_t(), N.get_mpz_t());
-        cout << "f_2_exp = " << f_2_exp << endl;
-        c_2 = f_2_exp * c_prime % N;
-        cout << "c_2 = " << c_2 << endl;
-        
-        
+        c_2 = f_2_exp * c_prime % N;        
         code = interact(l_prime, c_2);
         
         if (code != 1)
@@ -161,7 +156,7 @@ void attack(char* argv2)
         f_2 += f_1/2;
     }
     
-    cout << "f_2 = " << f_2 << "\n";
+    //cout << "f_2 = " << f_2 << "\n";
     
     //////////////////////////////////////////////////////////////////////
     // STEP 3.
@@ -179,7 +174,7 @@ void attack(char* argv2)
     while(m_min != m_max)
     {
         f_tmp = 2*B / (m_max - m_min);
-        cout << "f_tmp = " << f_tmp << "\n";
+        //cout << "f_tmp = " << f_tmp << "\n";
         
         i_bound = f_tmp * m_min / N;
         f_3 = (i_bound * N + m_min - 1) / m_min;
@@ -201,6 +196,21 @@ void attack(char* argv2)
     
     if (c_check == c_prime)
         cout << "MOO WINS!!!" << endl;
+    
+    
+    unsigned char buffer[128];
+    
+    // convert m_min from mpz_class to a byte array
+    // have the behaviour of I2OSP
+    mpz_export(buffer, NULL, 1, 1, 0, 0, m_min.get_mpz_t());
+    /*
+    unsigned char digest[SHA_DIGEST_LENGTH];
+    
+    SHA_CTX *ctx;
+    SHA1_Init(&ctx);
+    SHA1_Update(&ctx, m_min, strlen(m_min));
+    SHA_Final(digest, &ctx);*/
+    
 }
 
 
