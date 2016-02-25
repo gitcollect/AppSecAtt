@@ -92,7 +92,7 @@ int interact(const mpz_class &l_prime, const mpz_class &c_prime)
     // Print error code
 	int code;
 	fscanf(target_out, "%X", &code);
-	cout << "Error code: " << code << "\n";
+	//cout << "Error code: " << code << "\n";
     return code;
 }
 
@@ -206,7 +206,7 @@ void attack(char* argv2)
     // convert m_min from mpz_class to a byte array
     // have the behaviour of I2OSP
     mpz_export(buffer, NULL, 1, 1, 0, 0, m_min.get_mpz_t());
-    for (int j = 0; j <128; j++)
+    for (int j = 0; j < 128; j++)
         printf("%X", (unsigned int)buffer[j]);
     
     cout << endl;
@@ -215,6 +215,7 @@ void attack(char* argv2)
     // EME-OAEP Decoding                                                //
     //////////////////////////////////////////////////////////////////////
     
+    // 3. a.
     // convert l_prime to byte array
     mpz_export(bufferL, NULL, 1, 1, 0, 0, l_prime.get_mpz_t());
     
@@ -229,9 +230,28 @@ void attack(char* argv2)
     // hash
     SHA1(bufferL, hLen, digest);
     
-    for (int j = 0; j <SHA_DIGEST_LENGTH; j++)
+    for (int j = 0; j < SHA_DIGEST_LENGTH; j++)
         printf("%X", (unsigned int)digest[j]);
     
+    cout << endl;
+    
+    // 3. b.
+    unsigned char Y = buffer[0];
+    printf("Y = %X", Y);
+    cout << endl;
+    
+    unsigned char maskedSeed[hLen];
+    for (int j = 0; j < hLen; j++)
+        maskedSeed[j] = buffer[j+1];
+    for (int j = 0; j < hLen; j++)
+        printf("%X", (unsigned int)maskedSeed[j]);
+    cout << endl;
+    
+    unsigned char maskedDB[k - hLen - 1];
+    for (int j = 0; j < k - hLen - 1; j++)
+        maskedDB[j] = buffer[j+hLen+1];
+    for (int j = 0; j < k - hLen - 1; j++)
+        printf("%X", (unsigned int)maskedDB[j]);
     cout << endl;
 }
 
