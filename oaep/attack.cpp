@@ -201,18 +201,38 @@ void attack(char* argv2)
     
     
     //holder for the byte array
-    //unsigned char buffer[128];
+    unsigned char buffer[128], bufferL[128];
     
     // convert m_min from mpz_class to a byte array
     // have the behaviour of I2OSP
-    //mpz_export(buffer, NULL, 1, 1, 0, 0, m_min.get_mpz_t());
-    /*
+    mpz_export(buffer, NULL, 1, 1, 0, 0, m_min.get_mpz_t());
+    for (int j = 0; j <128; j++)
+        printf("%X", (unsigned int)buffer[j]);
+    
+    cout << endl;
+    
+    //////////////////////////////////////////////////////////////////////
+    // EME-OAEP Decoding                                                //
+    //////////////////////////////////////////////////////////////////////
+    
+    // convert l_prime to byte array
+    mpz_export(bufferL, NULL, 1, 1, 0, 0, l_prime.get_mpz_t());
+    
+    // digest for l_prime
     unsigned char digest[SHA_DIGEST_LENGTH];
     
-    SHA1_Init(SHA_CTX *ctx);
-    SHA1_Update(&ctx, buffer, strlen(m_min));
-    SHA_Final(digest, &ctx);*/
+    // size of l_prime in bytes
+    size_t hLen = mpz_size(l_prime.get_mpz_t())*mp_bits_per_limb / 8;
     
+    cout << hLen << endl;
+    
+    // hash
+    SHA1(bufferL, hLen, digest);
+    
+    for (int j = 0; j <SHA_DIGEST_LENGTH; j++)
+        printf("%X", (unsigned int)digest[j]);
+    
+    cout << endl;
 }
 
 
