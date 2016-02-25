@@ -237,22 +237,61 @@ void attack(char* argv2)
     
     // 3. b.
     unsigned char Y = buffer[0];
-    printf("Y = %X", Y);
+    printf("Y = %02X", Y);
     cout << endl;
     
+    cout << "maskedSeed = ";
     unsigned char maskedSeed[hLen];
     for (int j = 0; j < hLen; j++)
         maskedSeed[j] = buffer[j+1];
     for (int j = 0; j < hLen; j++)
-        printf("%X", (unsigned int)maskedSeed[j]);
+        printf("%02X", (unsigned int)maskedSeed[j]);
     cout << endl;
     
+    cout << "maskedDB = ";
     unsigned char maskedDB[k - hLen - 1];
     for (int j = 0; j < k - hLen - 1; j++)
         maskedDB[j] = buffer[j+hLen+1];
     for (int j = 0; j < k - hLen - 1; j++)
-        printf("%X", (unsigned int)maskedDB[j]);
+        printf("%02X", (unsigned int)maskedDB[j]);
     cout << endl;
+    
+    // 3. c.
+    cout << "seedMask =   ";
+    unsigned char seedMask[hLen];
+    PKCS1_MGF1(seedMask, hLen, maskedDB, k - hLen - 1, NULL);
+    for (int j = 0; j < hLen; j++)
+        printf("%02X", seedMask[j]);
+    cout << endl;
+    
+    // 3. d.
+    cout << "seed = ";
+    unsigned char seed[hLen];
+    for (int j = 0; j < hLen; j++)
+        seed[j] = maskedSeed[j] ^ seedMask[j];
+    for (int j = 0; j < hLen; j++)
+        printf("%02X", (unsigned int)seed[j]);
+    cout << endl;
+    
+    // 3. e.
+    cout << "dbMask = ";
+    unsigned char dbMask[k - hLen - 1];
+    PKCS1_MGF1(dbMask, k - hLen - 1, seed, hLen, NULL);
+    for (int j = 0; j < k - hLen - 1; j++)
+        printf("%02X", (unsigned int)dbMask[j]);
+    cout << endl;
+    
+    // 3. f.
+    cout << "DB = ";
+    unsigned char DB[k - hLen - 1];
+    for (int j = 0; j < k - hLen - 1; j++)
+        DB[j] = maskedDB[j] ^ dbMask[j];
+    for (int j = 0; j < k - hLen - 1; j++)
+        printf("%02X", (unsigned int)DB[j]);
+    cout << endl;
+    
+    // 3. g.
+    
 }
 
 
