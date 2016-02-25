@@ -200,14 +200,17 @@ void attack(char* argv2)
         cout << "MOO WINS!!!" << endl;
     
     
+    size_t sizeinbase = mpz_sizeinbase(m_min.get_mpz_t(), 256); 
+    cout << endl;
     //holder for the byte array
-    unsigned char buffer[128], bufferL[128];
+    unsigned char buffer[128] = {0}, bufferL[128] = {0};
     
     // convert m_min from mpz_class to a byte array
     // have the behaviour of I2OSP
-    mpz_export(buffer, NULL, 1, 1, 0, 0, m_min.get_mpz_t());
+    mpz_export(buffer + 128 - sizeinbase, NULL, 1, 1, 0, 0, m_min.get_mpz_t());
+    
     for (int j = 0; j < 128; j++)
-        printf("%X", (unsigned int)buffer[j]);
+        printf("%02X", (unsigned int)buffer[j]);
     
     cout << endl;
     
@@ -217,7 +220,8 @@ void attack(char* argv2)
     
     // 3. a.
     // convert l_prime to byte array
-    mpz_export(bufferL, NULL, 1, 1, 0, 0, l_prime.get_mpz_t());
+    sizeinbase = mpz_sizeinbase(l_prime.get_mpz_t(), 256);
+    mpz_export(bufferL + 128 - sizeinbase, NULL, 1, 1, 0, 0, l_prime.get_mpz_t());
     
     // digest for l_prime
     unsigned char digest[SHA_DIGEST_LENGTH];
@@ -291,7 +295,20 @@ void attack(char* argv2)
     cout << endl;
     
     // 3. g.
+    //cout << "lHash_prime = ";
+    unsigned char lHash_prime[hLen];
+    for (int j = 0; j < hLen; j++)
+        lHash_prime[j] = DB[j];
     
+    
+    cout << endl;
+    cout << endl;
+    for (int j = 0; j < hLen; j++)
+        printf("%02X", (unsigned int)lHash_prime[j]);
+    cout << endl;
+    cout << endl;
+    for (int j = 0; j < 128; j++)
+        printf("%02X", (unsigned int)bufferL[j]);
 }
 
 
