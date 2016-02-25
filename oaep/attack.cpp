@@ -78,9 +78,12 @@ int main(int argc, char* argv[])
 
 int interact(const mpz_class &l_prime, const mpz_class &c_prime)
 {
+    //cout << "In interact" << endl;
     // interact with 61061.D
 	gmp_fprintf(target_in, "%ZX\n%0256ZX\n", l_prime.get_mpz_t(), c_prime.get_mpz_t());
+    //cout << "Before flush" << endl;
 	fflush(target_in);
+    //cout << "After flush" << endl;
     
     //       code 0: decryption success 
     // error code 1: y >= B
@@ -89,7 +92,7 @@ int interact(const mpz_class &l_prime, const mpz_class &c_prime)
     // Print error code
 	int code;
 	fscanf(target_out, "%X", &code);
-	//cout << "Error code: " << code << "\n";
+	cout << "Error code: " << code << "\n";
     return code;
 }
 
@@ -188,7 +191,6 @@ void attack(char* argv2)
             m_min = (i_bound * N + B + f_3 - 1) / f_3;
         else if (code == 2)
             m_max = (i_bound * N + B) / f_3;
-       
     }
     
     mpz_class c_check;
@@ -198,17 +200,17 @@ void attack(char* argv2)
         cout << "MOO WINS!!!" << endl;
     
     
-    unsigned char buffer[128];
+    //holder for the byte array
+    //unsigned char buffer[128];
     
     // convert m_min from mpz_class to a byte array
     // have the behaviour of I2OSP
-    mpz_export(buffer, NULL, 1, 1, 0, 0, m_min.get_mpz_t());
+    //mpz_export(buffer, NULL, 1, 1, 0, 0, m_min.get_mpz_t());
     /*
     unsigned char digest[SHA_DIGEST_LENGTH];
     
-    SHA_CTX *ctx;
-    SHA1_Init(&ctx);
-    SHA1_Update(&ctx, m_min, strlen(m_min));
+    SHA1_Init(SHA_CTX *ctx);
+    SHA1_Update(&ctx, buffer, strlen(m_min));
     SHA_Final(digest, &ctx);*/
     
 }
