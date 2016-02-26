@@ -98,7 +98,9 @@ int interact(const mpz_class &l_prime, const mpz_class &c_prime)
 
 void attack(char* argv2)
 {
+    // count the number of interactions with the target
     unsigned int interaction_number = 0;
+    
 	// interact with 61061.conf
     // reading the input
 	ifstream config (argv2, ifstream::in);
@@ -108,13 +110,13 @@ void attack(char* argv2)
     // print k = ceil(log 256 (N))
 	//size_t sizeN = mpz_size(N.get_mpz_t());
     size_t k = mpz_sizeinbase(N.get_mpz_t(), 256);
-	cout << "size of N in bytes: " << k << "\n";
+	
     // print B = 2^(8*(k-1)) (mod N)
     // !!! assuming 2*B < N !!!
     mpz_class B;
     mpz_powm_ui(B.get_mpz_t(), mpz_class(2).get_mpz_t(), 8*(k - 1), N.get_mpz_t());
-    //cout << "B = " << B << "\n";
     
+ 
     //////////////////////////////////////////////////////////////////////
     // ATTACK                                                           //
     //////////////////////////////////////////////////////////////////////
@@ -144,7 +146,6 @@ void attack(char* argv2)
     
     // f_2 = 2*B/f_1
 	mpz_class f_2 = (N + B) / B * f_1 / 2;
-    //cout << "f_2 = " << f_2 << "\n";
     mpz_class f_2_exp;
     mpz_class c_2;
     code = -1;
@@ -169,19 +170,15 @@ void attack(char* argv2)
     
     // m_min = ceil( n / f_2 )
     mpz_class m_min = (N + f_2 - 1)/f_2;
-    //cout << "m_min = " << m_min << endl;
     // m_max = floor( (n + B) / f_2 )
     mpz_class m_max = (N + B)/f_2;
-    //cout << "m_max = " << m_max << endl;
     
     mpz_class f_3, f_3_exp, c_3, f_tmp;
     mpz_class i_bound;
     
     while(m_min != m_max)
     {
-        f_tmp = 2*B / (m_max - m_min);
-        //cout << "f_tmp = " << f_tmp << "\n";
-        
+        f_tmp = 2*B / (m_max - m_min);        
         i_bound = f_tmp * m_min / N;
         f_3 = (i_bound * N + m_min - 1) / m_min;
         
@@ -212,7 +209,7 @@ void attack(char* argv2)
     // have the behaviour of I2OSP
     mpz_export(buffer + 128 - sizeinbase, NULL, 1, 1, 0, 0, m_min.get_mpz_t());
     
-    cout << "Buffer = ";
+    cout << "Message (tagged and masked) = ";
     for (int j = 0; j < 128; j++)
         printf("%02X", (unsigned int)buffer[j]);
     
@@ -229,16 +226,14 @@ void attack(char* argv2)
     mpz_export(bufferL, NULL, 1, 1, 0, 0, l_prime.get_mpz_t());
     
     // digest for l_prime
-    unsigned char digest[SHA_DIGEST_LENGTH];
-    
-    //size_t SHA_DIGEST_LENGTH = SHA_DIGEST_LENGTH;
-    
-    // hash
-    SHA1(bufferL, sizeinbase, digest);
+    unsigned char lHash[SHA_DIGEST_LENGTH];
+ 
+    // hash the label, store in lHash
+    SHA1(bufferL, sizeinbase, lHash);
     
     cout << "lHash = ";
     for (int j = 0; j < SHA_DIGEST_LENGTH; j++)
-        printf("%02X", (unsigned int)digest[j]);
+        printf("%02X", (unsigned int)lHash[j]);
     
     cout << endl;
     
@@ -337,8 +332,7 @@ void attack(char* argv2)
     }
     
     // 3. g.
-    //cout << "lHash_prime = ";
-    cout << "     ";
+    cout << "lHash_prime = ";
     unsigned char lHash_prime[SHA_DIGEST_LENGTH];
     for (int j = 0; j < SHA_DIGEST_LENGTH; j++)
         lHash_prime[j] = DB[j];
@@ -360,12 +354,13 @@ void attack(char* argv2)
         message[i] = (unsigned int)DB[l];
         //printf("%02X", (unsigned int)DB[l]);
     
+    cout << "Recovered message:\n";
     for (int i = 0; i < k - SHA_DIGEST_LENGTH - 2 - j; i++)
         printf("%02X", (unsigned int)message[i]);
     cout << endl;
     
-    cout << "INTERACTIONS = " << interaction_number << endl;
-    unsigned char c_check2[128];
+    cout << "Number of interactions with the target:\n" << interaction_number << endl;
+/*    unsigned char c_check2[128];
     
     unsigned char e_check[128];
     unsigned char n_check[128];
@@ -390,7 +385,7 @@ void attack(char* argv2)
     
     cout << endl << "c_check2 = ";
     for (int i = 0; i < 128; i++)
-        cout << (unsigned int) c_check2[i];
+        cout << (unsigned int) c_check2[i];*/
 }
 
 
