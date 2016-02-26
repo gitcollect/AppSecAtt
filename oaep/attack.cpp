@@ -78,12 +78,10 @@ int main(int argc, char* argv[])
 
 int interact(const mpz_class &l_prime, const mpz_class &c_prime)
 {
-    //cout << "In interact" << endl;
     // interact with 61061.D
 	gmp_fprintf(target_in, "%ZX\n%0256ZX\n", l_prime.get_mpz_t(), c_prime.get_mpz_t());
-    //cout << "Before flush" << endl;
 	fflush(target_in);
-    //cout << "After flush" << endl;
+
     
     //       code 0: decryption success 
     // error code 1: y >= B
