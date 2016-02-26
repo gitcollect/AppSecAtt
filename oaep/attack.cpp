@@ -201,7 +201,6 @@ void attack(char* argv2)
     
     
     size_t sizeinbase = mpz_sizeinbase(m_min.get_mpz_t(), 256); 
-    cout << endl;
     //holder for the byte array
     unsigned char buffer[128] = {0}, bufferL[128] = {0};
     
@@ -209,6 +208,7 @@ void attack(char* argv2)
     // have the behaviour of I2OSP
     mpz_export(buffer + 128 - sizeinbase, NULL, 1, 1, 0, 0, m_min.get_mpz_t());
     
+    cout << "Buffer = ";
     for (int j = 0; j < 128; j++)
         printf("%02X", (unsigned int)buffer[j]);
     
@@ -221,21 +221,19 @@ void attack(char* argv2)
     // 3. a.
     // convert l_prime to byte array
     sizeinbase = mpz_sizeinbase(l_prime.get_mpz_t(), 256);
-    mpz_export(bufferL + 128 - sizeinbase, NULL, 1, 1, 0, 0, l_prime.get_mpz_t());
+    mpz_export(bufferL, NULL, 1, 1, 0, 0, l_prime.get_mpz_t());
     
     // digest for l_prime
     unsigned char digest[SHA_DIGEST_LENGTH];
     
-    // size of l_prime in bytes
-    size_t hLen = mpz_size(l_prime.get_mpz_t())*mp_bits_per_limb / 8;
-    
-    cout << hLen << endl;
+    size_t hLen = SHA_DIGEST_LENGTH;
     
     // hash
-    SHA1(bufferL, hLen, digest);
+    SHA1(bufferL, sizeinbase, digest);
     
+    cout << "lHash = ";
     for (int j = 0; j < SHA_DIGEST_LENGTH; j++)
-        printf("%X", (unsigned int)digest[j]);
+        printf("%02X", (unsigned int)digest[j]);
     
     cout << endl;
     
@@ -263,7 +261,7 @@ void attack(char* argv2)
     // 3. c.
     cout << "seedMask =   ";
     unsigned char seedMask[hLen];
-    PKCS1_MGF1(seedMask, hLen, maskedDB, k - hLen - 1, NULL);
+    PKCS1_MGF1(seedMask, hLen, maskedDB, k - hLen - 1, EVP_sha1());
     for (int j = 0; j < hLen; j++)
         printf("%02X", seedMask[j]);
     cout << endl;
@@ -271,16 +269,32 @@ void attack(char* argv2)
     // 3. d.
     cout << "seed = ";
     unsigned char seed[hLen];
-    for (int j = 0; j < hLen; j++)
-        seed[j] = maskedSeed[j] ^ seedMask[j];
-    for (int j = 0; j < hLen; j++)
-        printf("%02X", (unsigned int)seed[j]);
-    cout << endl;
+
+    {
+        int j = 0, l = 0, r = 0;
+        
+        for (; j < hLen; j++)
+            if (maskedSeed[j] != 0)
+                break;
+        for (; l < hLen; l++)
+            if (seedMask[l] != 0)
+                break;
+            
+        if (j > l)
+            l = j;
+        
+        for (; r < hLen && l < hLen; r++, l++)
+            seed[r] = maskedSeed[l] ^ seedMask[l];
+
+        for (r = 0; r < hLen; r++)
+            printf("%02X", (unsigned int)seed[r]);
+        cout << endl;
+    }
     
     // 3. e.
     cout << "dbMask = ";
     unsigned char dbMask[k - hLen - 1];
-    PKCS1_MGF1(dbMask, k - hLen - 1, seed, hLen, NULL);
+    PKCS1_MGF1(dbMask, k - hLen - 1, seed, hLen, EVP_sha1());
     for (int j = 0; j < k - hLen - 1; j++)
         printf("%02X", (unsigned int)dbMask[j]);
     cout << endl;
@@ -288,27 +302,35 @@ void attack(char* argv2)
     // 3. f.
     cout << "DB = ";
     unsigned char DB[k - hLen - 1];
-    for (int j = 0; j < k - hLen - 1; j++)
-        DB[j] = maskedDB[j] ^ dbMask[j];
-    for (int j = 0; j < k - hLen - 1; j++)
-        printf("%02X", (unsigned int)DB[j]);
-    cout << endl;
+    {
+        int j = 0, l = 0, r = 0;
+        
+        for (; j < k - hLen - 1; j++)
+            if (maskedDB[j] != 0)
+                break;
+        for (; l < k - hLen - 1; l++)
+            if (dbMask[l] != 0)
+                break;
+            
+        if (j > l)
+            l = j;
+        
+        for (; r < k - hLen - 1 && l < k - hLen - 1; r++, l++)      
+            DB[r] = maskedDB[l] ^ dbMask[l];
+        for (int j = 0; j < r; j++)
+            printf("%02X", (unsigned int)DB[j]);
+        cout << endl;
+        cout << endl;    
+    }
     
     // 3. g.
     //cout << "lHash_prime = ";
+    cout << "     ";
     unsigned char lHash_prime[hLen];
     for (int j = 0; j < hLen; j++)
         lHash_prime[j] = DB[j];
-    
-    
-    cout << endl;
-    cout << endl;
     for (int j = 0; j < hLen; j++)
-        printf("%02X", (unsigned int)lHash_prime[j]);
-    cout << endl;
-    cout << endl;
-    for (int j = 0; j < 128; j++)
-        printf("%02X", (unsigned int)bufferL[j]);
+        printf("%02X", DB[j]);
 }
 
 

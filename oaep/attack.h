@@ -11,6 +11,7 @@
 #include  <gmpxx.h>
 #include  <fstream>
 #include  <openssl/sha.h>
+#include  <openssl/evp.h>
 #include  <openssl/rsa.h>
 
 #endif
