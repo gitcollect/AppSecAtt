@@ -103,7 +103,7 @@ mpz_class montgomery_multiplication(mpz_class x, mpz_class y, mp_limb_t omega, m
         mpz_tdiv_q_2exp(r.get_mpz_t(), r.get_mpz_t(), mp_bits_per_limb);  // r <- r/b
     }
      
-    return r; // mpz_swap is O(1), while mpz_set is O(n) where n is the number of limbs
+    return r;
 }
 
 // Computing omega
@@ -147,7 +147,7 @@ void montgomery_rho_sq(mpz_class &rho_sq, mpz_class N)
 mpz_class montgomery_number(mpz_class num, mpz_class rho_sq, mp_limb_t omega, mpz_class N) 
 {
     // r <- mont_num = num * rho (mod N)
-    return montgomery_multiplication(num, rho_sq, omega, N);
+    return montgomery_multiplication(num, rho_sq, omega, N) % N;
 }
 
 // Montgomery reduction
@@ -225,26 +225,41 @@ void attack(char* argv2)
 	mpz_class N, e;
 	config >> hex >> N >> e;
     
-    vector<mpz_class> cs, part_cs_mul_sq, part_cs_sq;
+    // vectors of ciphertexts
+    vector<mpz_class> cs, part_cs_mul_sq, part_cs_sq, cs_sq;
+    
+    // execution times for the initial sample set of ciphertexts
     vector<int> times;
     
+    // declare variables for communication with the target
     mpz_class c, m;
     int time_c;
+    // produce random ciphertexts
     gmp_randclass randomness (gmp_randinit_default);
     
+    // Montgomery preprocessing
     mpz_class rho_sq;
     mp_limb_t omega;
     montgomery_omega(omega, N);
     montgomery_rho_sq(rho_sq, N);
+    
+    // d is the private key
     vector<bool> d;
     
-    for (int j = 0; j < 1000; j++)
+    // initial sample set and respective execution times
+    for (int j = 0; j < 4000; j++)
     {
         c = randomness.get_z_range(N);
         time_c = interact(c, m);
         c = montgomery_number(c, rho_sq, omega, N);
         cs.push_back(c);
         times.push_back(time_c);
+        c = montgomery_multiplication(c, c, omega, N);
+        
+        // will be used when prev d_i = 1
+        part_cs_mul_sq.push_back(c);
+        
+        part_cs_sq.push_back(0);
     }
     //cout << hex << "Message: " << m << endl;
    
@@ -252,23 +267,24 @@ void attack(char* argv2)
     // ATTACK                                             //
     ////////////////////////////////////////////////////////
     
-    // k_0 = 1
-    for (int j = 0; j < 1000; j++)
-    {
-        mpz_class x;
+    // d_0 = 1
+    // for (int j = 0; j < 4000; j++)
+    // {
+        // mpz_class x;
         
-        // SQUARE
-        x = montgomery_multiplication(cs[0],cs[0],omega,N);
+        //SQUARE
+        //x = montgomery_multiplication(cs[j],cs[j],omega,N)%N;
         
-        // MULTIPLY
-        x = montgomery_multiplication(x,cs[0],omega,N);
+        //MULTIPLY
+        // x = montgomery_multiplication(x,cs[j],omega,N);
         
-        // MODULAR REDUCTION
-        if (x > N)
-            x = x % N;
+        //MODULAR REDUCTION
+        // if (x > N)
+            // x = x % N;
         
-        part_cs_mul_sq.push_back(x);
-    }
+        // part_cs_mul_sq.push_back(x);
+        // part_cs_sq.push_back(x);
+    // }
     d.push_back(1);
     
     mpz_class prev_c;
@@ -282,16 +298,14 @@ void attack(char* argv2)
         // bit is 0
         int time0 = 0, time0red = 0;
         int time0_count = 0, time0red_count = 0;
-        
-        //vector<bucket> bucket1, bucket2, bucket3, bucket4;
 
-        for (int j = 0; j < 1000; j++)
+        for (int j = 0; j < 4000; j++)
         {    
             mpz_class x;
             int current_time = times[j];
             
             // case based on previous bit
-            if (d[i-1] == 0)
+            if (d.back() == 0)
                 prev_c = part_cs_sq[j];
             else
                 prev_c = part_cs_mul_sq[j];
@@ -299,6 +313,7 @@ void attack(char* argv2)
             //////////////////////////////////////////////////////
             // CASE WHERE
             // k_i = 0
+            
             // SQUARE
             x = montgomery_multiplication(prev_c,prev_c,omega,N);
             
@@ -314,45 +329,35 @@ void attack(char* argv2)
                 time0 += current_time;
                 time0_count++;
             }
-            
-            part_cs_sq.push_back(x);
+            part_cs_sq[j] = x;
             
             
             //////////////////////////////////////////////////////
             // CASE WHERE
             // k_i = 1
-            // SQUARE
-            x = montgomery_multiplication(prev_c,prev_c,omega,N);
             
-            bool hasRed = false;
+            // MULTIPLY
+            x = montgomery_multiplication(prev_c,cs[j],omega,N);
+            
+            //MODULAR REDUCTION
+            if (x >= N)
+                x = x % N;
+            
+            // SQUARE
+            x = montgomery_multiplication(x,x,omega,N);
+            
             if (x >= N)
             {
                 x = x % N;
-                hasRed = true;
                 time1red += current_time;
                 time1red_count++;
             }
-            
-            // MULTIPLY
-            x = montgomery_multiplication(x,cs[j],omega,N);
-            
-            // MODULAR REDUCTION
-            if (x >= N)
+            else
             {
-                x = x % N;
-                if (!hasRed)
-                {
-                    time1red_count++;
-                    time1red += current_time;
-                }
-            }
-            else if (!hasRed)
-            {
-                time1_count++;
                 time1 += current_time;
+                time1_count++;
             }
-            
-            part_cs_mul_sq.push_back(x);    
+            part_cs_mul_sq[j] = x;    
         }
         
         if (time1_count != 0)
@@ -367,10 +372,21 @@ void attack(char* argv2)
         if (time0red_count != 0)
             time0red = time0red/time0red_count;
         
+        cout << " time1 = " << time1;
+        cout << " time1red = " << time1red;
+        cout << " time0 = " << time0;
+        cout << " time0red = " << time0red;
+        
         if (abs(time1-time1red) > abs(time0-time0red))
+        {
             d.push_back(1);
+            cout << "d = 1\n";
+        }
         else
+        {
             d.push_back(0);
+            cout << "d = 0\n";
+        }
     }
     
     cout << "d = ";
