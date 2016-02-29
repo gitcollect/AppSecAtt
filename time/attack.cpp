@@ -17,6 +17,7 @@ struct bucket {
     int time_red;
 };
 
+int interact(mpz_class &c, mpz_class &m);
 void attack(char* argv2);
 void attackR(char* argv2);
 void cleanup(int s);
@@ -182,6 +183,28 @@ void montgomery_reduction(mpz_class &rop, mpz_class t, mp_limb_t omega, mpz_clas
     mpz_swap(rop.get_mpz_t(), r.get_mpz_t()); // mpz_swap is O(1), while mpz_set is O(n) where n is the number of limbs
 }
 
+mpz_class vec_to_num(const vector<bool> &d)
+{
+    mpz_class d_num = 0;
+    for (bool bit : d)
+        d_num = d_num * 2 + bit;
+    
+    return d_num;
+}
+
+bool verify(const mpz_class &e, const mpz_class &N, const mpz_class &sk)
+{
+    // encrypt message manually
+    mpz_class c = 0b1010;
+    mpz_class c_prime, m, m_prime;
+    mpz_powm(m.get_mpz_t(), c.get_mpz_t(), sk.get_mpz_t(), N.get_mpz_t());
+    interact(c, m_prime);
+    if (m == m_prime)
+        return true;
+    else
+        return false;
+}
+
 int interact(mpz_class &c, mpz_class &m)
 {
     // cout << "In interact" << endl;
@@ -297,9 +320,10 @@ void attack(char* argv2)
     
     // d is the private key
     vector<bool> d;
+    int oracle_queries = 3000;
     
     // initial sample set and respective execution times
-    for (int j = 0; j < 4000; j++)
+    for (int j = 0; j < oracle_queries; j++)
     {
         c = randomness.get_z_range(N);
         time_c = interact(c, m);
@@ -319,29 +343,12 @@ void attack(char* argv2)
     // ATTACK                                             //
     ////////////////////////////////////////////////////////
     
-    // d_0 = 1
-    // for (int j = 0; j < 4000; j++)
-    // {
-        // mpz_class x;
-        
-        //SQUARE
-        //x = montgomery_multiplication(cs[j],cs[j],omega,N)%N;
-        
-        //MULTIPLY
-        // x = montgomery_multiplication(x,cs[j],omega,N);
-        
-        //MODULAR REDUCTION
-        // if (x > N)
-            // x = x % N;
-        
-        // part_cs_mul_sq.push_back(x);
-        // part_cs_sq.push_back(x);
-    // }
     d.push_back(1);
     
     mpz_class prev_c;
+    bool isKey = false;
     
-    for (int i = 1; i < 1024; i++)
+    while (!isKey)
     {
         // bit is 1
         int time1 = 0, time1red = 0;
@@ -351,7 +358,7 @@ void attack(char* argv2)
         int time0 = 0, time0red = 0;
         int time0_count = 0, time0red_count = 0;
 
-        for (int j = 0; j < 4000; j++)
+        for (int j = 0; j < oracle_queries; j++)
         {    
             mpz_class x;
             int current_time = times[j];
@@ -439,6 +446,10 @@ void attack(char* argv2)
             d.push_back(0);
             cout << "d = 0\n";
         }
+        
+        // check if we have recovered the full private key
+        mpz_class sk = vec_to_num(d);
+        isKey = verify(e, N, sk);
     }
     
     cout << "d = ";
