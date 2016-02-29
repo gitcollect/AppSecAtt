@@ -18,6 +18,7 @@ struct bucket {
 };
 
 void attack(char* argv2);
+void attackR(char* argv2);
 void cleanup(int s);
 
 int main(int argc, char* argv[])
@@ -212,6 +213,57 @@ int calibrate(mpz_class &c, mpz_class &N, mpz_class &d, mpz_class &m)
 	gmp_fscanf(target_out, "%d\n%ZX", &time, m.get_mpz_t());
 	cout << dec << "Execution time: " << time << "\n";
     return time;
+}
+
+void attackR(char* argv2)
+{
+    // interact with 61061.conf
+    // reading the input
+	ifstream config (argv2, ifstream::in);
+	mpz_class N, e;
+	config >> hex >> N >> e;
+    
+    // declare variables for communication with the target
+    mpz_class c = 0, m, d;
+    int time, time1, time2, time3, time4;
+    vector<int> times;
+    
+    d = 0b1001;
+    time1 = calibrate(c, N, d, m);
+    cout << "Time for d = 1001: " << time1 << endl;
+    times.push_back(time1); 
+    d = 0b1010;
+    time = calibrate(c, N, d, m);
+    cout << "Time for d = 1010: " << time << endl;
+    times.push_back(time);
+    d = 0b1100;
+    time = calibrate(c, N, d, m);
+    cout << "Time for d = 1100: " << time << endl;
+    times.push_back(time);
+    d = 0b1000;
+    time2 = calibrate(c, N, d, m);
+    cout << "Time for d = 1000: " << time2 << endl;
+    cout << "Difference between 1001 and 1000: " << time1 - time2 << endl;
+    d = 0b100;
+    time4 = calibrate(c, N, d, m);
+    cout << "Time for d = 100: " << time4 << endl;
+    cout << "Difference between 100 and 1001: " << time1 - time4 << endl;
+    cout << "Difference between 100 and 1100: " << time - time4 << endl;
+    cout << "Difference between 100 and 1000: " << time2 - time4 << endl;
+    d = 0b1110;
+    time3 = calibrate(c, N, d, m);
+    cout << "Time for d = 1110: " << time3 << endl;
+    cout << "Difference between 1110 and  1001: " << time3 - time1 << endl;
+    
+    time = 0;
+    for (int i = 0; i < 3; i++)
+    {
+        time += times[i];
+    }
+    cout << "Average time: " << time/3 << endl;
+    
+    
+    
 }
 
 void attack(char* argv2)
