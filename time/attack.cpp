@@ -382,6 +382,7 @@ void attack(char* argv2)
         int time0 = 0, time0red = 0;
         int time0_count = 0, time0red_count = 0;
 
+        #pragma omp parallel for
         for (int j = 0; j < oracle_queries; j++)
         {
             mpz_class x;

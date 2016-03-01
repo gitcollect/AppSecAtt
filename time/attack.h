@@ -13,5 +13,6 @@
 #include  <openssl/sha.h>
 #include  <openssl/evp.h>
 #include  <openssl/rsa.h>
+#include  <X11/Xlib.h>
 
 #endif
