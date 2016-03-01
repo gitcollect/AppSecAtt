@@ -308,10 +308,6 @@ void attack(char* argv2)
 	mpz_class N, e;
 	config >> hex >> N >> e;
     
-    // vectors of ciphertexts
-    vector<mpz_class> cs;
-    vector<vector<mpz_class>> part_cs_mul_sq, part_cs_sq;
-    
     // execution times for the initial sample set of ciphertexts
     vector<int> times;
     
@@ -326,7 +322,11 @@ void attack(char* argv2)
     // No of (bits + bits set)
     int no_bits = (time_ex - time_overhead)/time_op;
     cout << "Upper bound on bits: " << no_bits << endl;
-
+    
+    // vectors of ciphertexts
+    vector<mpz_class> cs;
+    vector<vector<mpz_class>> part_cs_mul_sq(no_bits), part_cs_sq(no_bits);
+    
     // produce random ciphertexts
     gmp_randclass randomness (gmp_randinit_default);
     
@@ -338,7 +338,7 @@ void attack(char* argv2)
     
     // d is the private key
     vector<bool> d;
-    int oracle_queries = 4000;
+    int oracle_queries = 2500;
     
     // initial sample set and respective execution times
     for (int j = 0; j < oracle_queries; j++)
@@ -351,9 +351,9 @@ void attack(char* argv2)
         c = montgomery_multiplication(c, c, omega, N);
         
         // will be used when prev d_i = 1
-        part_cs_mul_sq.push_back(c);
+        part_cs_mul_sq[0].push_back(c);
         
-        part_cs_sq.push_back(0);
+        part_cs_sq[0].push_back(0);
     }
     //cout << hex << "Message: " << m << endl;
    
@@ -368,6 +368,7 @@ void attack(char* argv2)
     bool isKey = false;
     
     int iterations = 0;
+    vector<bool> isFlipped(no_bits, false);
     
     while (!isKey)
     {
@@ -382,15 +383,15 @@ void attack(char* argv2)
         int time0_count = 0, time0red_count = 0;
 
         for (int j = 0; j < oracle_queries; j++)
-        {    
+        {
             mpz_class x;
             int current_time = times[j];
             
             // case based on previous bit
             if (d.back() == 0)
-                prev_c = part_cs_sq[j];
+                prev_c = part_cs_sq[iterations-1][j];
             else
-                prev_c = part_cs_mul_sq[j];
+                prev_c = part_cs_mul_sq[iterations-1][j];
             
             //////////////////////////////////////////////////////
             // CASE WHERE
@@ -411,7 +412,12 @@ void attack(char* argv2)
                 time0 += current_time;
                 time0_count++;
             }
-            part_cs_sq[j] = x;
+            
+            if(part_cs_sq[iterations].size() <= j)
+                part_cs_sq[iterations].push_back(x);
+            else
+                part_cs_sq[iterations][j] = x;
+            
             
             
             //////////////////////////////////////////////////////
@@ -439,7 +445,10 @@ void attack(char* argv2)
                 time1 += current_time;
                 time1_count++;
             }
-            part_cs_mul_sq[j] = x;    
+            if(part_cs_mul_sq[iterations].size() <= j)
+                part_cs_mul_sq[iterations].push_back(x);
+            else
+                part_cs_mul_sq[iterations][j] = x;   
         }
         
         if (time1_count != 0)
@@ -460,65 +469,56 @@ void attack(char* argv2)
         cout << " time0red = " << time0red;
         cout << " Diff = " << abs(time1-time1red) - abs(time0-time0red);
         
-        if (abs(time1-time1red) > abs(time0-time0red))
+        if(abs(abs(time1-time1red) - abs(time0-time0red)) > 3 && no_bits > 0)
         {
-            d.push_back(1);
-            cout << " d = 1\n";
-            no_bits-=2;
+            if (abs(time1-time1red) > abs(time0-time0red))
+            {
+                d.push_back(1);
+                cout << " d = 1\n";
+                no_bits-=2;  
+            }
+            else
+            {
+                d.push_back(0);
+                cout << " d = 0\n";
+                no_bits--;
+            }
+            
+            if(isFlipped[iterations])
+                isFlipped[iterations] = false;
         }
         else
         {
-            d.push_back(0);
-            cout << " d = 0\n";
-            no_bits--;
+            iterations--;
+            
+            while(isFlipped[iterations])
+            {
+                no_bits += d.back() + 1;
+                d.pop_back();
+                iterations--;
+            }
+            
+            if (d.back())
+            {
+                d.pop_back();
+                d.push_back(0);
+                no_bits++;
+            }
+            else
+            {
+                d.pop_back();
+                d.push_back(1);
+                no_bits--;
+            }
+            isFlipped[iterations] = true; 
         }
         
         // check if we have recovered the full private key
         mpz_class sk = vec_to_num(d);
         isKey = verify(e, N, sk);
-        
-        //if (iterations == 64)
-            //break;
-        if(no_bits < 0)
-        {
-            cout << "Iterations: " << iterations << endl;
-            break;
-        }
-        // resampling condition
-        // if (iterations > 1000)
-        // {
-            // d = vector<bool>();
-            // part_cs_mul_sq = vector<mpz_class>();
-            // part_cs_sq = vector<mpz_class>();
-            // d.push_back(1);
-            // iterations = 0;
-            
-            // for (int j = 0; j < oracle_queries; j++)
-            // {
-               // will be used when prev d_i = 1
-                // part_cs_mul_sq.push_back(c);
-                // part_cs_sq.push_back(0);
-            // }
-            
-            // for (int j = 0; j < oracle_queries; j++)
-            // {
-                // c = randomness.get_z_range(N);
-                // time_c = interact(c, m);
-                // c = montgomery_number(c, rho_sq, omega, N);
-                // cs.push_back(c);
-                // times.push_back(time_c);
-                // c = montgomery_multiplication(c, c, omega, N);
-                
-                //will be used when prev d_i = 1
-                // part_cs_mul_sq.push_back(c);
-                
-                // part_cs_sq.push_back(0);
-            // }
-            // oracle_queries += oracle_queries;
-        // }
     }
     
-    cout << "d = ";
+    cout << "\nd = ";
     for (int j = 0; j < d.size(); j++)
         cout << d[j];
 }
