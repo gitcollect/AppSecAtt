@@ -188,7 +188,6 @@ mpz_class vec_to_num(const vector<bool> &d)
     mpz_class d_num = 0;
     for (bool bit : d)
         d_num = d_num * 2 + bit;
-    
     return d_num;
 }
 
@@ -247,8 +246,8 @@ void attackR(char* argv2)
 	config >> hex >> N >> e;
     
     // declare variables for communication with the target
-    mpz_class c = 0, m, d;
-    int time, time1, time2, time3, time4;
+    mpz_class c = 0b00, m, d;
+    int time, time1, time2, time3, time4, time5, time6, time7;
     vector<int> times;
     
     d = 0b1001;
@@ -277,6 +276,15 @@ void attackR(char* argv2)
     time3 = calibrate(c, N, d, m);
     cout << "Time for d = 1110: " << time3 << endl;
     cout << "Difference between 1110 and  1001: " << time3 - time1 << endl;
+    d = 0b1;
+    time5 = calibrate(c, N, d, m);
+    cout << "Time for d = 1: " << time5 << endl;
+    d = 0b10;
+    time6 = calibrate(c, N, d, m);
+    cout << "Time for d = 10: " << time6 << endl;
+    d = 0b11;
+    time7 = calibrate(c, N, d, m);
+    cout << "Time for d = 11: " << time7 << endl;
     
     time = 0;
     for (int i = 0; i < 3; i++)
@@ -301,14 +309,24 @@ void attack(char* argv2)
 	config >> hex >> N >> e;
     
     // vectors of ciphertexts
-    vector<mpz_class> cs, part_cs_mul_sq, part_cs_sq, cs_sq;
+    vector<mpz_class> cs;
+    vector<vector<mpz_class>> part_cs_mul_sq, part_cs_sq;
     
     // execution times for the initial sample set of ciphertexts
     vector<int> times;
     
     // declare variables for communication with the target
-    mpz_class c, m;
+    mpz_class c=0, m;
     int time_c;
+    
+    // time got from 61061.R
+    int time_op = 3770, time_overhead = 2*time_op;
+    // get execution time
+    int time_ex = interact(c, m);
+    // No of (bits + bits set)
+    int no_bits = (time_ex - time_overhead)/time_op;
+    cout << "Upper bound on bits: " << no_bits << endl;
+
     // produce random ciphertexts
     gmp_randclass randomness (gmp_randinit_default);
     
@@ -320,7 +338,7 @@ void attack(char* argv2)
     
     // d is the private key
     vector<bool> d;
-    int oracle_queries = 3000;
+    int oracle_queries = 4000;
     
     // initial sample set and respective execution times
     for (int j = 0; j < oracle_queries; j++)
@@ -344,12 +362,17 @@ void attack(char* argv2)
     ////////////////////////////////////////////////////////
     
     d.push_back(1);
+    no_bits--;
     
     mpz_class prev_c;
     bool isKey = false;
     
+    int iterations = 0;
+    
     while (!isKey)
     {
+        iterations++;
+        
         // bit is 1
         int time1 = 0, time1red = 0;
         int time1_count = 0, time1red_count = 0;
@@ -435,21 +458,64 @@ void attack(char* argv2)
         cout << " time1red = " << time1red;
         cout << " time0 = " << time0;
         cout << " time0red = " << time0red;
+        cout << " Diff = " << abs(time1-time1red) - abs(time0-time0red);
         
         if (abs(time1-time1red) > abs(time0-time0red))
         {
             d.push_back(1);
-            cout << "d = 1\n";
+            cout << " d = 1\n";
+            no_bits-=2;
         }
         else
         {
             d.push_back(0);
-            cout << "d = 0\n";
+            cout << " d = 0\n";
+            no_bits--;
         }
         
         // check if we have recovered the full private key
         mpz_class sk = vec_to_num(d);
         isKey = verify(e, N, sk);
+        
+        //if (iterations == 64)
+            //break;
+        if(no_bits < 0)
+        {
+            cout << "Iterations: " << iterations << endl;
+            break;
+        }
+        // resampling condition
+        // if (iterations > 1000)
+        // {
+            // d = vector<bool>();
+            // part_cs_mul_sq = vector<mpz_class>();
+            // part_cs_sq = vector<mpz_class>();
+            // d.push_back(1);
+            // iterations = 0;
+            
+            // for (int j = 0; j < oracle_queries; j++)
+            // {
+               // will be used when prev d_i = 1
+                // part_cs_mul_sq.push_back(c);
+                // part_cs_sq.push_back(0);
+            // }
+            
+            // for (int j = 0; j < oracle_queries; j++)
+            // {
+                // c = randomness.get_z_range(N);
+                // time_c = interact(c, m);
+                // c = montgomery_number(c, rho_sq, omega, N);
+                // cs.push_back(c);
+                // times.push_back(time_c);
+                // c = montgomery_multiplication(c, c, omega, N);
+                
+                //will be used when prev d_i = 1
+                // part_cs_mul_sq.push_back(c);
+                
+                // part_cs_sq.push_back(0);
+            // }
+            // oracle_queries += oracle_queries;
+        // }
     }
     
     cout << "d = ";
