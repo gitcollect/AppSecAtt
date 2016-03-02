@@ -114,6 +114,11 @@ void attack(char* argv2)
     mpz_class B;
     mpz_powm_ui(B.get_mpz_t(), mpz_class(2).get_mpz_t(), 8*(k - 1), N.get_mpz_t());
     
+    if (2*B < N)
+        cout << "YEY\n";
+    else
+        cout << "CRY\n";
+    
  
     //////////////////////////////////////////////////////////////////////
     // ATTACK                                                           //
@@ -130,13 +135,13 @@ void attack(char* argv2)
     {
         mpz_ui_pow_ui(f_1.get_mpz_t(), 2, i);
         mpz_powm(f_1_exp.get_mpz_t(), f_1.get_mpz_t(), e.get_mpz_t(), N.get_mpz_t());
-        c_1 = f_1 * c_prime % N;
+        c_1 = f_1_exp * c_prime % N;
         code = interact(l_prime, c_1);
         interaction_number++;
         i++;
     }
     
-    //cout << "f_1 c [B/2, 2*B) = " << f_1 << "\n";
+    cout << "f_1 c [B/2, 2*B) = " << f_1 << "\n";
     
     
     //////////////////////////////////////////////////////////////////////
@@ -148,7 +153,7 @@ void attack(char* argv2)
     mpz_class c_2;
     code = -1;
     
-    while (true)
+    while(true)
     {
         mpz_powm(f_2_exp.get_mpz_t(), f_2.get_mpz_t(), e.get_mpz_t(), N.get_mpz_t());
         c_2 = f_2_exp * c_prime % N;        
