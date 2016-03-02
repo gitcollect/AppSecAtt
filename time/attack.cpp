@@ -17,7 +17,7 @@ struct bucket {
     int time_red;
 };
 
-int interact(mpz_class &c, mpz_class &m);
+int interact(mpz_class &c, mpz_class &m, unsigned int &interaction_number);
 void attack(char* argv2);
 void attackR(char* argv2);
 void cleanup(int s);
@@ -191,20 +191,20 @@ mpz_class vec_to_num(const vector<bool> &d)
     return d_num;
 }
 
-bool verify(const mpz_class &e, const mpz_class &N, const mpz_class &sk)
+bool verify(const mpz_class &e, const mpz_class &N, const mpz_class &sk, unsigned int &interaction_number)
 {
     // encrypt message manually
     mpz_class c = 0b1010;
     mpz_class c_prime, m, m_prime;
     mpz_powm(m.get_mpz_t(), c.get_mpz_t(), sk.get_mpz_t(), N.get_mpz_t());
-    interact(c, m_prime);
+    interact(c, m_prime, interaction_number);
     if (m == m_prime)
         return true;
     else
         return false;
 }
 
-int interact(mpz_class &c, mpz_class &m)
+int interact(mpz_class &c, mpz_class &m, unsigned int &interaction_number)
 {
     // cout << "In interact" << endl;
     // interact with 61061.D
@@ -218,6 +218,7 @@ int interact(mpz_class &c, mpz_class &m)
 	int time;
 	gmp_fscanf(target_out, "%d\n%ZX", &time, m.get_mpz_t());
 	cout << dec << "Execution time: " << time << "\n";
+    interaction_number++;
     return time;
 }
 
@@ -318,7 +319,7 @@ void attack(char* argv2)
     // time got from 61061.R
     int time_op = 3770, time_overhead = 2*time_op;
     // get execution time
-    int time_ex = interact(c, m);
+    int time_ex = interact(c, m, interaction_number);
     // No of (bits + bits set)
     int no_bits = (time_ex - time_overhead)/time_op;
     cout << "Upper bound on bits: " << no_bits << endl;
@@ -338,13 +339,13 @@ void attack(char* argv2)
     
     // d is the private key
     vector<bool> d;
-    int oracle_queries = 2500;
+    int oracle_queries = 250;
     
     // initial sample set and respective execution times
     for (int j = 0; j < oracle_queries; j++)
     {
         c = randomness.get_z_range(N);
-        time_c = interact(c, m);
+        time_c = interact(c, m, interaction_number);
         c = montgomery_number(c, rho_sq, omega, N);
         cs.push_back(c);
         times.push_back(time_c);
@@ -365,14 +366,42 @@ void attack(char* argv2)
     no_bits--;
     
     mpz_class prev_c;
-    bool isKey = false;
+    bool isKey = false, doResample = false;
     
-    int iterations = 0;
+    int bit_i = 0, backtracks = 0;
     vector<bool> isFlipped(no_bits, false);
     
     while (!isKey)
     {
-        iterations++;
+        bit_i++;
+        
+        if (doResample)
+        {
+            for (int j = 0; j < oracle_queries; j++)
+            {
+                cout << "RESAMPLING\n"; 
+                c = randomness.get_z_range(N);
+                time_c = interact(c, m, interaction_number);
+                c = montgomery_number(c, rho_sq, omega, N);
+                cs.push_back(c);
+                times.push_back(time_c);
+                c = montgomery_multiplication(c, c, omega, N);
+                
+                // will be used when prev d_i = 1
+                part_cs_mul_sq[0].push_back(c);
+                
+                part_cs_sq[0].push_back(0);
+            }
+
+            oracle_queries += oracle_queries;
+            fill(isFlipped.begin(), isFlipped.end(), false);
+            bit_i = 0;
+            no_bits = (time_ex - time_overhead)/time_op - 1;
+            d.clear();
+            d.push_back(1);
+            doResample = false;
+            continue;
+        }
         
         // bit is 1
         int time1 = 0, time1red = 0;
@@ -382,7 +411,7 @@ void attack(char* argv2)
         int time0 = 0, time0red = 0;
         int time0_count = 0, time0red_count = 0;
 
-        #pragma omp parallel for
+        //#pragma omp parallel for
         for (int j = 0; j < oracle_queries; j++)
         {
             mpz_class x;
@@ -390,9 +419,9 @@ void attack(char* argv2)
             
             // case based on previous bit
             if (d.back() == 0)
-                prev_c = part_cs_sq[iterations-1][j];
+                prev_c = part_cs_sq[bit_i-1][j];
             else
-                prev_c = part_cs_mul_sq[iterations-1][j];
+                prev_c = part_cs_mul_sq[bit_i-1][j];
             
             //////////////////////////////////////////////////////
             // CASE WHERE
@@ -414,10 +443,10 @@ void attack(char* argv2)
                 time0_count++;
             }
             
-            if(part_cs_sq[iterations].size() <= j)
-                part_cs_sq[iterations].push_back(x);
+            if(part_cs_sq[bit_i].size() <= j)
+                part_cs_sq[bit_i].push_back(x);
             else
-                part_cs_sq[iterations][j] = x;
+                part_cs_sq[bit_i][j] = x;
             
             
             
@@ -435,6 +464,7 @@ void attack(char* argv2)
             // SQUARE
             x = montgomery_multiplication(x,x,omega,N);
             
+            //MODULAR REDUCTION
             if (x >= N)
             {
                 x = x % N;
@@ -446,10 +476,11 @@ void attack(char* argv2)
                 time1 += current_time;
                 time1_count++;
             }
-            if(part_cs_mul_sq[iterations].size() <= j)
-                part_cs_mul_sq[iterations].push_back(x);
+            
+            if(part_cs_mul_sq[bit_i].size() <= j)
+                part_cs_mul_sq[bit_i].push_back(x);
             else
-                part_cs_mul_sq[iterations][j] = x;   
+                part_cs_mul_sq[bit_i][j] = x;   
         }
         
         if (time1_count != 0)
@@ -485,18 +516,28 @@ void attack(char* argv2)
                 no_bits--;
             }
             
-            if(isFlipped[iterations])
-                isFlipped[iterations] = false;
+            if(isFlipped[bit_i])
+            {
+                isFlipped[bit_i] = false;
+                backtracks = 0;
+            }
         }
         else
         {
-            iterations--;
+            bit_i--;
             
-            while(isFlipped[iterations])
+            while(isFlipped[bit_i])
             {
                 no_bits += d.back() + 1;
                 d.pop_back();
-                iterations--;
+                bit_i--;
+                backtracks++;
+            }
+            
+            if (backtracks > 4)
+            {
+                doResample = true;
+                continue;
             }
             
             if (d.back())
@@ -511,17 +552,19 @@ void attack(char* argv2)
                 d.push_back(1);
                 no_bits--;
             }
-            isFlipped[iterations] = true; 
+            isFlipped[bit_i] = true; 
         }
         
         // check if we have recovered the full private key
         mpz_class sk = vec_to_num(d);
-        isKey = verify(e, N, sk);
+        isKey = verify(e, N, sk, interaction_number);
     }
     
     cout << "\nd = ";
     for (int j = 0; j < d.size(); j++)
         cout << d[j];
+    
+    cout << "\n Interactions: " << interaction_number;
 }
 
 
