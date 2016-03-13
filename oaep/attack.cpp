@@ -114,10 +114,10 @@ void attack(char* argv2)
     mpz_class B;
     mpz_powm_ui(B.get_mpz_t(), mpz_class(2).get_mpz_t(), 8*(k - 1), N.get_mpz_t());
     
-    if (2*B < N)
-        cout << "YEY\n";
-    else
+    if (2*B >= N)
         cout << "CRY\n";
+    else
+        cout << "YEY\n";
     
  
     //////////////////////////////////////////////////////////////////////

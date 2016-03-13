@@ -183,6 +183,7 @@ void montgomery_reduction(mpz_class &rop, mpz_class t, mp_limb_t omega, mpz_clas
     mpz_swap(rop.get_mpz_t(), r.get_mpz_t()); // mpz_swap is O(1), while mpz_set is O(n) where n is the number of limbs
 }
 
+// Convert vector of bools to a number
 mpz_class vec_to_num(const vector<bool> &d)
 {
     mpz_class d_num = 0;
@@ -193,11 +194,15 @@ mpz_class vec_to_num(const vector<bool> &d)
 
 bool verify(const mpz_class &e, const mpz_class &N, const mpz_class &sk, unsigned int &interaction_number)
 {
-    // encrypt message manually
+    // decrypt ciphertext manually
     mpz_class c = 0b1010;
     mpz_class c_prime, m, m_prime;
     mpz_powm(m.get_mpz_t(), c.get_mpz_t(), sk.get_mpz_t(), N.get_mpz_t());
+    
+    // decrypt the same ciphertext with the oracle
     interact(c, m_prime, interaction_number);
+    
+    // check if the two messages are the same
     if (m == m_prime)
         return true;
     else
@@ -206,18 +211,14 @@ bool verify(const mpz_class &e, const mpz_class &N, const mpz_class &sk, unsigne
 
 int interact(mpz_class &c, mpz_class &m, unsigned int &interaction_number)
 {
-    // cout << "In interact" << endl;
     // interact with 61061.D
 	gmp_fprintf(target_in, "%0256ZX\n", c.get_mpz_t());
-    //cout << hex << "C = " << c << endl;
-    // cout << "Before flush" << endl;
 	fflush(target_in);
-    // cout << "After flush" << endl;
     
     // Print execution time
 	int time;
 	gmp_fscanf(target_out, "%d\n%ZX", &time, m.get_mpz_t());
-	cout << dec << "Execution time: " << time << "\n";
+	//cout << dec << "Execution time: " << time << "\n";
     interaction_number++;
     return time;
 }
@@ -321,12 +322,12 @@ void attack(char* argv2)
     // get execution time
     int time_ex = interact(c, m, interaction_number);
     // No of (bits + bits set)
-    int no_bits = (time_ex - time_overhead)/time_op;
-    cout << "Upper bound on bits: " << no_bits << endl;
+    int bits_num = (time_ex - time_overhead)/time_op;
+    cout << "Upper bound on bits: " << bits_num << endl;
     
     // vectors of ciphertexts
     vector<mpz_class> cs;
-    vector<vector<mpz_class>> part_cs_mul_sq(no_bits), part_cs_sq(no_bits);
+    vector<vector<mpz_class>> part_cs_mul_sq(bits_num), part_cs_sq(bits_num);
     
     // produce random ciphertexts
     gmp_randclass randomness (gmp_randinit_default);
@@ -339,7 +340,7 @@ void attack(char* argv2)
     
     // d is the private key
     vector<bool> d;
-    int oracle_queries = 250;
+    int oracle_queries = 1000;
     
     // initial sample set and respective execution times
     for (int j = 0; j < oracle_queries; j++)
@@ -356,20 +357,21 @@ void attack(char* argv2)
         
         part_cs_sq[0].push_back(0);
     }
-    //cout << hex << "Message: " << m << endl;
    
     ////////////////////////////////////////////////////////
     // ATTACK                                             //
     ////////////////////////////////////////////////////////
     
     d.push_back(1);
-    no_bits--;
+    bits_num -= 2;
     
     mpz_class prev_c;
     bool isKey = false, doResample = false;
     
+    // bit and backtrack counter
     int bit_i = 0, backtracks = 0;
-    vector<bool> isFlipped(no_bits, false);
+    vector<bool> isFlipped(bits_num, false);
+    vector<int> timeDiff;
     
     while (!isKey)
     {
@@ -377,9 +379,9 @@ void attack(char* argv2)
         
         if (doResample)
         {
-            for (int j = 0; j < oracle_queries; j++)
+            cout << "RESAMPLING\n"; 
+            for (int j = 0; j < 250; j++)
             {
-                cout << "RESAMPLING\n"; 
                 c = randomness.get_z_range(N);
                 time_c = interact(c, m, interaction_number);
                 c = montgomery_number(c, rho_sq, omega, N);
@@ -393,13 +395,14 @@ void attack(char* argv2)
                 part_cs_sq[0].push_back(0);
             }
 
-            oracle_queries += oracle_queries;
+            oracle_queries += 250;
             fill(isFlipped.begin(), isFlipped.end(), false);
             bit_i = 0;
-            no_bits = (time_ex - time_overhead)/time_op - 1;
+            bits_num = (time_ex - time_overhead)/time_op - 2;
             d.clear();
             d.push_back(1);
             doResample = false;
+            backtracks = 0;
             continue;
         }
         
@@ -500,20 +503,38 @@ void attack(char* argv2)
         cout << " time0 = " << time0;
         cout << " time0red = " << time0red;
         cout << " Diff = " << abs(time1-time1red) - abs(time0-time0red);
+        cout << " backtracks = " << backtracks;
         
-        if(abs(abs(time1-time1red) - abs(time0-time0red)) > 3 && no_bits > 0)
+        timeDiff.push_back(abs(abs(time1-time1red) - abs(time0-time0red)));
+        
+        // find local mean instead of a set threshold
+        int localTimeMean;
+        
+        if (backtracks > 0)
+        {
+            localTimeMean = 0;
+            for (int k = 0; k < backtracks; k++)
+                localTimeMean += timeDiff[bit_i - k];
+            
+            localTimeMean /= backtracks;
+            cout << "local time mean = " << localTimeMean << "\n";
+        }
+        else
+            localTimeMean = timeDiff.back();
+        
+        if(abs(abs(time1-time1red) - abs(time0-time0red)) > 3 && bits_num > 0)
         {
             if (abs(time1-time1red) > abs(time0-time0red))
             {
                 d.push_back(1);
                 cout << " d = 1\n";
-                no_bits-=2;  
+                bits_num-=2;  
             }
             else
             {
                 d.push_back(0);
                 cout << " d = 0\n";
-                no_bits--;
+                bits_num--;
             }
             
             if(isFlipped[bit_i])
@@ -528,13 +549,13 @@ void attack(char* argv2)
             
             while(isFlipped[bit_i])
             {
-                no_bits += d.back() + 1;
+                bits_num += d.back() + 1;
                 d.pop_back();
                 bit_i--;
                 backtracks++;
             }
             
-            if (backtracks > 4)
+            if (backtracks > 2)
             {
                 doResample = true;
                 continue;
@@ -544,20 +565,23 @@ void attack(char* argv2)
             {
                 d.pop_back();
                 d.push_back(0);
-                no_bits++;
+                bits_num++;
             }
             else
             {
                 d.pop_back();
                 d.push_back(1);
-                no_bits--;
+                bits_num--;
             }
             isFlipped[bit_i] = true; 
         }
         
         // check if we have recovered the full private key
-        mpz_class sk = vec_to_num(d);
-        isKey = verify(e, N, sk, interaction_number);
+        if(bits_num == 0)
+        {
+            mpz_class sk = vec_to_num(d);
+            isKey = verify(e, N, sk, interaction_number);
+        }
     }
     
     cout << "\nd = ";

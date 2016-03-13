@@ -1,11 +1,77 @@
 Q.1 Consider an example where N = 551, e = 5, d = 101 and c = 243.  Using
     your own words, briefly explain and illustrate the working principle of
     this attack (i.e., how and why it works).
+    
+    k = ceil(log_256 (N)) = 2
+    B = 2^(8(k-1)) mod N = 256
+    All valid ciphertexts are in the range [0; B) which holds for c = 243.
+    The Manger attack works when 2B < N, which holds for the example values.
+    
+    Step 1.
+        1) f_1 = 2     send f_1^e * c (mod N) = 62
+           From oracle: c^d (mod N) = m     62^101 (mod 551) = 6    6 < B
+            => err code 2   f_1 = 4
+        proceed until:
+           f_1 = 128   send f_1^e * c (mod N) = 74
+           From oracle: 74^101 (mod 551) = 384      384 > B
+            => err code 1 => move onto Step 2.
+    Step 2.
+        f_2 = floor((N + B) / B) * f_1/2    f_2 = 192
+        1) f_2 = 192   send f_2^e * c (mod N) = 4
+            From oracle: 4^101 (mod 551) = 35   35 < B
+             => err code 2 => move onto Step 3.
+    Step 3.
+        range [m_min; m_min) of possible m values, where
+        m_min = ceil(N/f_2) = 3
+        m_max = floor((N + B)/ f_2) = 4
+            while it can be seen the recovered m is 3, the working principle
+            is as follows:
+            f_tmp = floor(2B/(m_max - m_min)) = 512
+            i = floor(f_tmp * m_min / N) = 2
+            f_3 = ceil(i*N/m_min) = 368     send f_3^e * c (mod N) = 32
+            From oracle: 32^101 (mod 551) = 2   2 < B
+             => err code 2
+             => m_max = floor((i*N + B)/ f_3) = 3
+        Now m_min = m_max = 3
+    
+    Check: (m^e)^d = m (mod N) and m^e = c (mod N)
+           (3^5)^101 = 3 (mod 551) holds
+           3^5 = 243 (mod 551) holds
+    SOLVED, TO WRITE HERE
+    
 Q.2 To prevent the attack, the vendor suggests altering the software: the
     idea is that no matter what error occurs, the same error code will be
-    produced.  Explain whether (and why, or why not) this change alone is
+    produced. Explain whether (and why, or why not) this change alone is
     sufficient.
+    
+    RFC, section 7.1.2 outlines that the target returns "decryption error"
+    (and nothing more specific) if such occurs. This makes the scheme immune
+    to Manger's attack (implemented in the following version 2.2). However,
+    in case the error message is returned as soon as a decryption error occurs,
+    the system would still be vulnerable to timing attacks.
+    
+    https://www.cdc.informatik.tu-darmstadt.de/reports/reports/mangers_attack_revisited.pdf
+    
 Q.6 RSA has a homomorphic property: explain what this means, and how it
     relates to this attack.
+    
+    A scheme is homomorphic if given ciphertexts c_1 of m_1 and c_2 of m_2 it is
+    possible to create ciphertext c_3 of m_1*m_2. Homomorphic encryption schemes
+    are malleable by design. A scheme is malleable if given a ciphertext c of a
+    message m it is possible to compute a valid ciphertext of a message related to
+    m without needing to know m.
+    
+    At each step of the attack a ciphertext is modified (multiplied by f_i) and 
+    because of the malleable property of the scheme, the modification will be 
+    reflected in the message. While the oracle does not decrypt the ciphertext
+    (in which case the attack will be straightforward), the error code returned
+    allows for an informed decision about the next modification of the ciphertext.
+
+    (Crypto slides and wiki)
+    
 Q.7 Side-channel attacks are often categorised as being either simple or
     differential: how would categorise this attack, and why?
+    
+    The attack on RSAES-OAEP does not induce faults, istead it directly
+    exploits the implementation of the scheme. Hence, it can be categorised as a
+    simple side channel attack.

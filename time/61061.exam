@@ -2,13 +2,46 @@ Q.1 The vendor of the attack target is concerned that news of this attack
     could scare off potential customers; they will make any alteration
     necessary (in software or hardware) to prevent the attack.  Explain the
     options they have, and which one you would recommend.
+    
+    Software - add redundant code to mimic reduction/multiply and lead to
+    overall constant execution time (regardless of the key bit)
+    Software/Hardware - parallelise (and create confusion)
+    
+    
 Q.2 Let n denote the number of simulated clock cycles required to execute a
     Montgomery multiplication on the attack target.  Estimate the value of
     n (as accurately as you can) and explain how you did so.
+    
+    |       |  c^d  | Operations needed | Exectution time |
+    |_______|_______|___________________|_________________|
+    | c = 0 |  c^1  |     mul + sq      |     15 123      |
+    |       |  c^10 |     mul + 2sq     |     18 892      |
+    
+    Both mul and sq are executed using Montgomery multiplication, and hence
+    take roughly the same time. Therefore, it can be computed that a Montgomery
+    multiplication takes approximately 3770-80 (units of measurement). An
+    overhead of roughly double that time can be noticed. However, this is the 
+    time needed to convert the ciphertext to a Montgomery number before decryption
+    commences, and reducing it to a normal integer afterwards. Both these algorithms
+    involve a Montgomery multiplication, hence the overhead in question is just two
+    more Montgomery multiplications. n = 3770
+    //Therefore, once the whole execution time is given by the target, it can be divided
+    //by 3770-80 to obtain the number of Montgomery multiplications. In my case this 
+    //number is: n = 98.
+
+    
 Q.7 Numerous factors might produce noise within measurements of execution
     time: based on the given attack target and context, outline at least
     two examples.
+    
+    Memory (RAM) temperature might affect execution time for decryption CHECK THIS FACT
+    Cache attack https://eprint.iacr.org/2011/557.pdf
+    
+    
 Q.8 The level of noise, n, within measurements of execution time will
     influence the number of measurements, m, required for a successful
     attack.  Explain what the relationship between n and m is (i.e., how
     you expect m to grow as n grows).
+    
+    Assume an example case with a level of noise n requires m measurements. If another
+    case has a level of noise 2n, then 2m measurements will be required.
