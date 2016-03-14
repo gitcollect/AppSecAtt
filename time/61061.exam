@@ -3,15 +3,34 @@ Q.1 The vendor of the attack target is concerned that news of this attack
     necessary (in software or hardware) to prevent the attack.  Explain the
     options they have, and which one you would recommend.
     
-    Software - add redundant code to mimic reduction/multiply and lead to
-    overall constant execution time (regardless of the key bit)
-    Software/Hardware - parallelise (and create confusion)
+    1) Redundant code could be added - perform reduction regardless of the
+    key bit and lead to overall constant execution time.
+    2) Blinding - the data can be blinded before the ciphertext c is raised
+    to the d-th power:
+        1. pick a random number r
+        2. compute q = r^e (mod N)
+        3. compute C = cq (mod N)
+        4. compute M = C^d (mod N)
+        5. compute m = M/r (mod N)
+    This works as:
+       M/r = C^d/r = (cq)^d/r = (x^d)(q^d)/r = (x^d)r/r = x^d (mod N).
+    Using this process makes it hard for the attacker to learn anything 
+    about the private key d. [1]
+    3) Software/Hardware - parallelise the algorithms (and create confusion), however,
+    timing attacks are still possible.
+    4) Chinese Remainder Theorem instead of Square-And-Multiply - inefficacious
+    if the attacker can exploit intermediate values in the initial reduction
+    of c mod p and c mod q; the final (combination) step of the CRT can also be
+    exploited.
     
+    I would personally recommend the second approach.
+    
+    [1]http://crypto.stackexchange.com/questions/5953/what-is-blinding-used-for-in-cryptography
     
 Q.2 Let n denote the number of simulated clock cycles required to execute a
     Montgomery multiplication on the attack target.  Estimate the value of
     n (as accurately as you can) and explain how you did so.
-    
+     _____________________________________________________
     |       |  c^d  | Operations needed | Exectution time |
     |_______|_______|___________________|_________________|
     | c = 0 |  c^1  |     mul + sq      |     15 123      |
@@ -35,7 +54,9 @@ Q.7 Numerous factors might produce noise within measurements of execution
     two examples.
     
     Memory (RAM) temperature might affect execution time for decryption CHECK THIS FACT
-    Cache attack https://eprint.iacr.org/2011/557.pdf
+    Network latency
+    TLS handshakes take a random amount of time
+    Cache hit and miss (Cache attack https://eprint.iacr.org/2011/557.pdf )
     
     
 Q.8 The level of noise, n, within measurements of execution time will
@@ -43,5 +64,13 @@ Q.8 The level of noise, n, within measurements of execution time will
     attack.  Explain what the relationship between n and m is (i.e., how
     you expect m to grow as n grows).
     
-    Assume an example case with a level of noise n requires m measurements. If another
-    case has a level of noise 2n, then 2m measurements will be required.
+    Assume an example case where a level of noise n requires m measurements. If another 
+    case has a level of noise 2n, then 4m measurements will be required. In general, the
+    number of measurements required increases as the square of the noise level. [1][2]
+    
+    However, in the general case, the number m is dependent on the choice of statistical
+    model - one can simply average the execution times for all samples, or could use a more
+    sophisticated approach (Monte Carlo bootstraping).
+    
+    [1] http://gauss.ececs.uc.edu/Courses/c653/lectures/SideC/intro.pdf
+    [2] http://courses.csail.mit.edu/6.857/2006/handouts/TimingAttacks.pdf
