@@ -105,17 +105,16 @@ void attack(char* argv2)
 	mpz_class N, e, l_prime, c_prime;
 	config >> hex >> N >> e >> l_prime >> c_prime;
     
-    // print k = ceil(log 256 (N))
-	//size_t sizeN = mpz_size(N.get_mpz_t());
+    // k = ceil(log 256 (N))
     size_t k = mpz_sizeinbase(N.get_mpz_t(), 256);
 	
-    // print B = 2^(8*(k-1)) (mod N)
+    // B = 2^(8*(k-1)) (mod N)
     // !!! assuming 2*B < N !!!
     mpz_class B;
     mpz_powm_ui(B.get_mpz_t(), mpz_class(2).get_mpz_t(), 8*(k - 1), N.get_mpz_t());
     
     if (2*B >= N)
-        cout << "CRY\n";
+        abort();
     else
         cout << "YEY\n";
     
@@ -133,10 +132,10 @@ void attack(char* argv2)
 
     while (code != 1) 
     {
-        mpz_ui_pow_ui(f_1.get_mpz_t(), 2, i);
-        mpz_powm(f_1_exp.get_mpz_t(), f_1.get_mpz_t(), e.get_mpz_t(), N.get_mpz_t());
-        c_1 = f_1_exp * c_prime % N;
-        code = interact(l_prime, c_1);
+        mpz_ui_pow_ui(f_1.get_mpz_t(), 2, i); // f_1 = 2^i where i is the iteration
+        mpz_powm(f_1_exp.get_mpz_t(), f_1.get_mpz_t(), e.get_mpz_t(), N.get_mpz_t()); // compute (f_1)^e (mod N)
+        c_1 = f_1_exp * c_prime % N; // c_1 = (f_1)^e * c' (mod N)
+        code = interact(l_prime, c_1); // send c_1 to the oracle and get the error code
         interaction_number++;
         i++;
     }
@@ -147,19 +146,19 @@ void attack(char* argv2)
     //////////////////////////////////////////////////////////////////////
     // STEP 2.
     
-    // f_2 = 2*B/f_1
-	mpz_class f_2 = (N + B) / B * f_1 / 2;
+	mpz_class f_2 = (N + B) / B * f_1 / 2; // initialise f_2 using f_1 from the previous step
     mpz_class f_2_exp;
     mpz_class c_2;
     code = -1;
     
     while(true)
     {
-        mpz_powm(f_2_exp.get_mpz_t(), f_2.get_mpz_t(), e.get_mpz_t(), N.get_mpz_t());
-        c_2 = f_2_exp * c_prime % N;        
-        code = interact(l_prime, c_2);
+        mpz_powm(f_2_exp.get_mpz_t(), f_2.get_mpz_t(), e.get_mpz_t(), N.get_mpz_t()); // compute (f_2)^e (mod N)
+        c_2 = f_2_exp * c_prime % N; // c_2 = (f_2)^e * c' (mod N)      
+        code = interact(l_prime, c_2); // send c_2 to the oracle and get error code
         interaction_number++;
         
+        // break out of the loop and proceed to step 3.
         if (code != 1)
             break;
         

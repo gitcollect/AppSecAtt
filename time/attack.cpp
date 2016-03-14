@@ -11,11 +11,7 @@ int attack_raw[2];   // unbuffered communication: attack target -> attacker
 FILE* target_out = NULL; // buffered attack target input  stream
 FILE* target_in  = NULL; // buffered attack target output stream
 
-struct bucket {
-    mpz_class ciphertext;
-    int time_mul;
-    int time_red;
-};
+int bit_slack = 0;
 
 int interact(mpz_class &c, mpz_class &m, unsigned int &interaction_number);
 void attack(char* argv2);
@@ -304,6 +300,9 @@ void attack(char* argv2)
     // count the number of interactions with the target
     unsigned int interaction_number = 0;
     
+    // count the number of resamples
+    unsigned int resamples = 0;
+    
 	// interact with 61061.conf
     // reading the input
 	ifstream config (argv2, ifstream::in);
@@ -314,15 +313,15 @@ void attack(char* argv2)
     vector<int> times;
     
     // declare variables for communication with the target
-    mpz_class c=0, m;
-    int time_c;
+    mpz_class c = 0, m;
+    int time_c = 0;
     
     // time got from 61061.R
     int time_op = 3770, time_overhead = 2*time_op;
     // get execution time
     int time_ex = interact(c, m, interaction_number);
     // No of (bits + bits set)
-    int bits_num = (time_ex - time_overhead)/time_op;
+    int bits_num = (time_ex - time_overhead)/time_op + bit_slack;
     cout << "Upper bound on bits: " << bits_num << endl;
     
     // vectors of ciphertexts
@@ -340,7 +339,7 @@ void attack(char* argv2)
     
     // d is the private key
     vector<bool> d;
-    int oracle_queries = 1000;
+    int oracle_queries = 2000;
     
     // initial sample set and respective execution times
     for (int j = 0; j < oracle_queries; j++)
@@ -379,7 +378,8 @@ void attack(char* argv2)
         
         if (doResample)
         {
-            cout << "RESAMPLING\n"; 
+            cout << "RESAMPLING\n";
+            resamples++;
             for (int j = 0; j < 250; j++)
             {
                 c = randomness.get_z_range(N);
@@ -414,7 +414,6 @@ void attack(char* argv2)
         int time0 = 0, time0red = 0;
         int time0_count = 0, time0red_count = 0;
 
-        //#pragma omp parallel for
         for (int j = 0; j < oracle_queries; j++)
         {
             mpz_class x;
@@ -450,8 +449,6 @@ void attack(char* argv2)
                 part_cs_sq[bit_i].push_back(x);
             else
                 part_cs_sq[bit_i][j] = x;
-            
-            
             
             //////////////////////////////////////////////////////
             // CASE WHERE
@@ -497,33 +494,19 @@ void attack(char* argv2)
         
         if (time0red_count != 0)
             time0red = time0red/time0red_count;
-        
+        /*
         cout << " time1 = " << time1;
         cout << " time1red = " << time1red;
         cout << " time0 = " << time0;
-        cout << " time0red = " << time0red;
+        cout << " time0red = " << time0red;*/
         cout << " Diff = " << abs(time1-time1red) - abs(time0-time0red);
         cout << " backtracks = " << backtracks;
         
         timeDiff.push_back(abs(abs(time1-time1red) - abs(time0-time0red)));
-        
-        // find local mean instead of a set threshold
-        int localTimeMean;
-        
-        if (backtracks > 0)
+
+        if(abs(abs(time1-time1red) - abs(time0-time0red)) > 10 && bits_num > 0)
         {
-            localTimeMean = 0;
-            for (int k = 0; k < backtracks; k++)
-                localTimeMean += timeDiff[bit_i - k];
-            
-            localTimeMean /= backtracks;
-            cout << "local time mean = " << localTimeMean << "\n";
-        }
-        else
-            localTimeMean = timeDiff.back();
-        
-        if(abs(abs(time1-time1red) - abs(time0-time0red)) > 3 && bits_num > 0)
-        {
+            cout << "in if\n";
             if (abs(time1-time1red) > abs(time0-time0red))
             {
                 d.push_back(1);
@@ -545,15 +528,31 @@ void attack(char* argv2)
         }
         else
         {
+            // ?????????????????
+            if(bit_i == 0)
+            {
+                doResample = true;
+                continue;
+            }
+            
+            cout << "bits_num = " << bits_num; 
             bit_i--;
             
             while(isFlipped[bit_i])
             {
+                // ????????????????
+                if(bit_i == 0)
+                {
+                    doResample = true;
+                    break;
+                }
                 bits_num += d.back() + 1;
                 d.pop_back();
                 bit_i--;
                 backtracks++;
             }
+            if(doResample)
+                continue;
             
             if (backtracks > 2)
             {
@@ -563,12 +562,14 @@ void attack(char* argv2)
             
             if (d.back())
             {
+                cout << "add 0\n";
                 d.pop_back();
                 d.push_back(0);
                 bits_num++;
             }
             else
             {
+                cout << "add 1\n";
                 d.pop_back();
                 d.push_back(1);
                 bits_num--;
@@ -579,6 +580,7 @@ void attack(char* argv2)
         // check if we have recovered the full private key
         if(bits_num == 0)
         {
+            cout << bits_num << endl;
             mpz_class sk = vec_to_num(d);
             isKey = verify(e, N, sk, interaction_number);
         }
@@ -588,7 +590,8 @@ void attack(char* argv2)
     for (int j = 0; j < d.size(); j++)
         cout << d[j];
     
-    cout << "\n Interactions: " << interaction_number;
+    cout << "\nInteractions: " << interaction_number;
+    
 }
 
 
