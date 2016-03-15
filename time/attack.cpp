@@ -344,42 +344,51 @@ void attack(char* argv2)
     // initial sample set and respective execution times
     for (int j = 0; j < oracle_queries; j++)
     {
+        // compute a random ciphertexts
         c = randomness.get_z_range(N);
+        // find the time needed to decrypt it
         time_c = interact(c, m, interaction_number);
+        
+        // convert the ciphertext to a montgomery number
+        // for the target simulation
         c = montgomery_number(c, rho_sq, omega, N);
+        // save the current ciphertext
         cs.push_back(c);
+        // and its execution time
         times.push_back(time_c);
+        
+        // compute the square
         c = montgomery_multiplication(c, c, omega, N);
         
-        // will be used when prev d_i = 1
-        part_cs_mul_sq[0].push_back(c);
-        
-        part_cs_sq[0].push_back(0);
+        // vectors for partial exponentiations
+        part_cs_mul_sq[0].push_back(c); // will be used when previous d_i = 1
+        part_cs_sq[0].push_back(0);     // will be used when previous d_i = 0
     }
    
     ////////////////////////////////////////////////////////
     // ATTACK                                             //
     ////////////////////////////////////////////////////////
     
+    // assume the first bit of d is 1
     d.push_back(1);
     bits_num -= 2;
     
-    mpz_class prev_c;
     bool isKey = false, doResample = false;
     
     // bit and backtrack counter
     int bit_i = 0, backtracks = 0;
     vector<bool> isFlipped(bits_num, false);
-    vector<int> timeDiff;
+    
+    // mpz integer to hold the private key once recovered
+    mpz_class sk;
     
     while (!isKey)
     {
-        bit_i++;
-        
         if (doResample)
         {
+            // add 250 more samples
             cout << "RESAMPLING\n";
-            resamples++;
+            //resamples++;
             for (int j = 0; j < 250; j++)
             {
                 c = randomness.get_z_range(N);
@@ -395,67 +404,83 @@ void attack(char* argv2)
                 part_cs_sq[0].push_back(0);
             }
 
+            // clear all variables and start guessing the key again
             oracle_queries += 250;
             fill(isFlipped.begin(), isFlipped.end(), false);
             bit_i = 0;
-            bits_num = (time_ex - time_overhead)/time_op - 2;
-            d.clear();
-            d.push_back(1);
+            bits_num = (time_ex - time_overhead)/time_op - 2; // -2 as d starts with a 1
+            d.clear(); // clear all guesses
+            d.push_back(1); // push first bit 1
             doResample = false;
             backtracks = 0;
-            continue;
         }
         
-        // bit is 1
-        int time1 = 0, time1red = 0;
-        int time1_count = 0, time1red_count = 0;
+        // keep track of the bit we are recovering
+        bit_i++;
         
-        // bit is 0
+        /////////////////////////////////////////////////////////////
+        // confidence measures - average calculations for hypotheses
+        
+        // case for bit is 1
+        // time1 - no reduction; time1red - had reduction
+        int time1 = 0, time1red = 0;
+        int time1_count = 0, time1red_count = 0; // counters
+        
+        // case for bit is 0
+        // time0 - no reduction; time0red - had reduction
         int time0 = 0, time0red = 0;
-        int time0_count = 0, time0red_count = 0;
+        int time0_count = 0, time0red_count = 0; // counters
 
+        // for each sample ciphertext
         for (int j = 0; j < oracle_queries; j++)
         {
-            mpz_class x;
+            // x is the current calculation, prev_x is the previous calculation
+            mpz_class x, prev_x;
+            
+            // obtain the time it took to decrypt the current
+            // ciphertext using the target
             int current_time = times[j];
             
-            // case based on previous bit
+            // get partial exponentiation based on previous bit
             if (d.back() == 0)
-                prev_c = part_cs_sq[bit_i-1][j];
+                prev_x = part_cs_sq[bit_i-1][j];
             else
-                prev_c = part_cs_mul_sq[bit_i-1][j];
+                prev_x = part_cs_mul_sq[bit_i-1][j];
+            
             
             //////////////////////////////////////////////////////
             // CASE WHERE
-            // k_i = 0
+            // d_i = 0
             
             // SQUARE
-            x = montgomery_multiplication(prev_c,prev_c,omega,N);
+            x = montgomery_multiplication(prev_x,prev_x,omega,N);
             
             // MODULAR REDUCTION
             if (x >= N)
             {
                 x = x % N;
-                time0red += current_time;
-                time0red_count++;
+                time0red += current_time; // add the current time to the sum
+                time0red_count++; // increment counter
             }
             else
             {
-                time0 += current_time;
-                time0_count++;
+                time0 += current_time; // add the current time to the sum
+                time0_count++; // increment counter
             }
             
+            // insert or update the partial exponentiation for the case d_i = 0
             if(part_cs_sq[bit_i].size() <= j)
                 part_cs_sq[bit_i].push_back(x);
             else
                 part_cs_sq[bit_i][j] = x;
             
+            
             //////////////////////////////////////////////////////
             // CASE WHERE
-            // k_i = 1
+            // d_i = 1
             
             // MULTIPLY
-            x = montgomery_multiplication(prev_c,cs[j],omega,N);
+            x = montgomery_multiplication(prev_x,cs[j],omega,N);
             
             //MODULAR REDUCTION
             if (x >= N)
@@ -468,21 +493,23 @@ void attack(char* argv2)
             if (x >= N)
             {
                 x = x % N;
-                time1red += current_time;
-                time1red_count++;
+                time1red += current_time; // add the current time to the sum
+                time1red_count++; // increment counter
             }
             else
             {
-                time1 += current_time;
-                time1_count++;
+                time1 += current_time; // add the current time to the sum
+                time1_count++; // increment counter
             }
             
+            // insert or update the partial exponentiation for the case d_i = 1
             if(part_cs_mul_sq[bit_i].size() <= j)
                 part_cs_mul_sq[bit_i].push_back(x);
             else
                 part_cs_mul_sq[bit_i][j] = x;   
         }
         
+        // ensure no division by 0 is done
         if (time1_count != 0)
             time1 = time1/time1_count;
         
@@ -501,87 +528,92 @@ void attack(char* argv2)
         cout << " time0red = " << time0red;*/
         cout << " Diff = " << abs(time1-time1red) - abs(time0-time0red);
         cout << " backtracks = " << backtracks;
-        
-        timeDiff.push_back(abs(abs(time1-time1red) - abs(time0-time0red)));
 
-        if(abs(abs(time1-time1red) - abs(time0-time0red)) > 10 && bits_num > 0)
+        // check if confidence measure is high enough
+        // second check ensures there are still bits to be recovered
+        if(abs(abs(time1-time1red) - abs(time0-time0red)) > 6 && bits_num > 0)
         {
-            cout << "in if\n";
+            // check which bit should be predicted based on confidence measures
             if (abs(time1-time1red) > abs(time0-time0red))
             {
+                // predict 1
                 d.push_back(1);
                 cout << " d = 1\n";
                 bits_num-=2;  
             }
             else
             {
+                // predict 0
                 d.push_back(0);
                 cout << " d = 0\n";
                 bits_num--;
             }
             
+            // error correction case for backtracking once only
             if(isFlipped[bit_i])
             {
                 isFlipped[bit_i] = false;
                 backtracks = 0;
             }
         }
-        else
+        else // confidence is not strong enough, hence backtrack
         {
-            // ?????????????????
-            if(bit_i == 0)
-            {
-                doResample = true;
-                continue;
-            }
-            
-            cout << "bits_num = " << bits_num; 
-            bit_i--;
+            bit_i--; // decrement bit count for each backtrack
             
             while(isFlipped[bit_i])
             {
-                // ????????????????
+                // the beginning of d has been reached, resample 
+                // and start to attack again
                 if(bit_i == 0)
                 {
                     doResample = true;
                     break;
                 }
+                
+                // adjust hamming weight + number of bits
                 bits_num += d.back() + 1;
+                // remove guess for the last bit
                 d.pop_back();
+                // decrement bit count for each backtrack
                 bit_i--;
+                // increment how much it has backtracked
                 backtracks++;
             }
+            
+            // if it's backtracked too much, resample
+            if (backtracks > 2)
+                doResample = true;
+
+            // if the beginning of the key has been reached, resample
             if(doResample)
                 continue;
             
-            if (backtracks > 2)
-            {
-                doResample = true;
-                continue;
-            }
-            
+            // if the last bit is 1, set it to 0
             if (d.back())
             {
-                cout << "add 0\n";
                 d.pop_back();
                 d.push_back(0);
+                // adjust hamming weight + number of bits
                 bits_num++;
             }
-            else
+            else // if the last bit is 0, set it to 1
             {
-                cout << "add 1\n";
                 d.pop_back();
                 d.push_back(1);
+                // adjust hamming weight + number of bits
                 bits_num--;
             }
+            
+            // keep track of the flipped bits
             isFlipped[bit_i] = true; 
         }
         
         // check if we have recovered the full private key
         if(bits_num == 0)
         {
-            cout << bits_num << endl;
-            mpz_class sk = vec_to_num(d);
+            // convert the vector of bits to an mpz integer
+            sk = vec_to_num(d);
+            // check if it's the right private key
             isKey = verify(e, N, sk, interaction_number);
         }
     }
@@ -590,7 +622,9 @@ void attack(char* argv2)
     for (int j = 0; j < d.size(); j++)
         cout << d[j];
     
-    cout << "\nInteractions: " << interaction_number;
+    cout << "\nd = " << hex << uppercase << sk;
+    
+    cout << "\nInteractions: " << dec << interaction_number << "\n";
     
 }
 
