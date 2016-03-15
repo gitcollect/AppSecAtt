@@ -388,7 +388,6 @@ void attack(char* argv2)
         {
             // add 250 more samples
             cout << "RESAMPLING\n";
-            //resamples++;
             for (int j = 0; j < 250; j++)
             {
                 c = randomness.get_z_range(N);
@@ -423,8 +422,8 @@ void attack(char* argv2)
         
         // case for bit is 1
         // time1 - no reduction; time1red - had reduction
-        int time1 = 0, time1red = 0;
-        int time1_count = 0, time1red_count = 0; // counters
+        long time1 = 0, time1red = 0;
+        long time1_count = 0, time1red_count = 0; // counters
         
         // case for bit is 0
         // time0 - no reduction; time0red - had reduction
@@ -521,11 +520,11 @@ void attack(char* argv2)
         
         if (time0red_count != 0)
             time0red = time0red/time0red_count;
-        /*
+        
         cout << " time1 = " << time1;
         cout << " time1red = " << time1red;
         cout << " time0 = " << time0;
-        cout << " time0red = " << time0red;*/
+        cout << " time0red = " << time0red;
         cout << " Diff = " << abs(time1-time1red) - abs(time0-time0red);
         cout << " backtracks = " << backtracks;
 
