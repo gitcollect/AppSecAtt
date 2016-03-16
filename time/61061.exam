@@ -16,8 +16,8 @@ Q.1 The vendor of the attack target is concerned that news of this attack
        M/r = C^d/r = (cq)^d/r = (x^d)(q^d)/r = (x^d)r/r = x^d (mod N).
     Using this process makes it hard for the attacker to learn anything 
     about the private key d. [1]
-    3) Software/Hardware - parallelise the algorithms (and create confusion), however,
-    timing attacks are still possible.
+    3) Software/Hardware - parallelise the algorithms (and create confusion),
+    however, timing attacks are still possible.
     4) Chinese Remainder Theorem instead of Square-And-Multiply - inefficacious
     if the attacker can exploit intermediate values in the initial reduction
     of c mod p and c mod q; the final (combination) step of the CRT can also be
@@ -37,9 +37,9 @@ Q.2 Let n denote the number of simulated clock cycles required to execute a
     |       |  c^10 |     mul + 2sq     |     18 892      |
     
     Both mul and sq are executed using Montgomery multiplication, and hence
-    take roughly the same time. Therefore, it can be computed that a Montgomery
-    multiplication takes approximately 3770-80 (units of measurement). An
-    overhead of roughly double that time can be noticed. However, this is the 
+    take roughly the same time. Therefore, it can be computed that a 
+    Montgomery multiplication takes approximately 3770-80 (units of measurement).
+    An overhead of roughly double that time can be noticed. However, this is the 
     time needed to convert the ciphertext to a Montgomery number before decryption
     commences, and reducing it to a normal integer afterwards. Both these algorithms
     involve a Montgomery multiplication, hence the overhead in question is just two
@@ -53,10 +53,10 @@ Q.7 Numerous factors might produce noise within measurements of execution
     time: based on the given attack target and context, outline at least
     two examples.
     
-    Memory (RAM) temperature might affect execution time for decryption CHECK THIS FACT
-    Network latency
-    TLS handshakes take a random amount of time
-    Cache hit and miss (Cache attack https://eprint.iacr.org/2011/557.pdf )
+    Memory (RAM) temperature, network latency and cache hit and miss can all
+    affect execution time for decryption.
+
+    (Cache attack https://eprint.iacr.org/2011/557.pdf )
     
     
 Q.8 The level of noise, n, within measurements of execution time will

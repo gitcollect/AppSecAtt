@@ -316,7 +316,8 @@ void attack(char* argv2)
     mpz_class c = 0, m;
     int time_c = 0;
     
-    // time got from 61061.R
+    // time it takes to do a single Montgomery multiplication
+    // got from 61061.R
     int time_op = 3770, time_overhead = 2*time_op;
     // get execution time
     int time_ex = interact(c, m, interaction_number);
@@ -422,12 +423,12 @@ void attack(char* argv2)
         
         // case for bit is 1
         // time1 - no reduction; time1red - had reduction
-        long time1 = 0, time1red = 0;
-        long time1_count = 0, time1red_count = 0; // counters
+        long long time1 = 0, time1red = 0;
+        int time1_count = 0, time1red_count = 0; // counters
         
         // case for bit is 0
         // time0 - no reduction; time0red - had reduction
-        int time0 = 0, time0red = 0;
+        long long time0 = 0, time0red = 0;
         int time0_count = 0, time0red_count = 0; // counters
 
         // for each sample ciphertext
@@ -509,6 +510,7 @@ void attack(char* argv2)
         }
         
         // ensure no division by 0 is done
+        // and average the values for all cases
         if (time1_count != 0)
             time1 = time1/time1_count;
         
@@ -525,7 +527,7 @@ void attack(char* argv2)
         cout << " time1red = " << time1red;
         cout << " time0 = " << time0;
         cout << " time0red = " << time0red;
-        cout << " Diff = " << abs(time1-time1red) - abs(time0-time0red);
+        cout << " Diff = " << abs(abs(time1-time1red) - abs(time0-time0red));
         cout << " backtracks = " << backtracks;
 
         // check if confidence measure is high enough

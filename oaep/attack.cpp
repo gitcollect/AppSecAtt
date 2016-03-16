@@ -75,25 +75,27 @@ int main(int argc, char* argv[])
 	return 0;
 }
 
-
+// interact with the target by inputting a label and a ciphertext
+// obtain and return an error code
 int interact(const mpz_class &l_prime, const mpz_class &c_prime)
 {
     // interact with 61061.D
 	gmp_fprintf(target_in, "%ZX\n%0256ZX\n", l_prime.get_mpz_t(), c_prime.get_mpz_t());
 	fflush(target_in);
 
-    
     //       code 0: decryption success 
     // error code 1: y >= B
     // error code 2: y < B (?)
     
-    // Print error code
+    // return error code
 	int code;
 	fscanf(target_out, "%X", &code);
-	//cout << "Error code: " << code << "\n";
+    
     return code;
 }
 
+// attack the target to recover the message
+// unmask and unpad the result from the attack to obtain the "pure" message
 void attack(char* argv2)
 {
     // count the number of interactions with the target
@@ -114,10 +116,7 @@ void attack(char* argv2)
     mpz_powm_ui(B.get_mpz_t(), mpz_class(2).get_mpz_t(), 8*(k - 1), N.get_mpz_t());
     
     if (2*B >= N)
-        abort();
-    else
-        cout << "YEY\n";
-    
+        abort();    
  
     //////////////////////////////////////////////////////////////////////
     // ATTACK                                                           //
@@ -130,23 +129,24 @@ void attack(char* argv2)
     mpz_class f_1_exp;
     mpz_class c_1; // c_1 = f_1 * c' (mod N)
 
+    // increase f_1 until error code 1 is received
     while (code != 1) 
     {
         mpz_ui_pow_ui(f_1.get_mpz_t(), 2, i); // f_1 = 2^i where i is the iteration
         mpz_powm(f_1_exp.get_mpz_t(), f_1.get_mpz_t(), e.get_mpz_t(), N.get_mpz_t()); // compute (f_1)^e (mod N)
         c_1 = f_1_exp * c_prime % N; // c_1 = (f_1)^e * c' (mod N)
         code = interact(l_prime, c_1); // send c_1 to the oracle and get the error code
-        interaction_number++;
-        i++;
+        interaction_number++; // increment number of interactions
+        i++; // increment exponent for updating f_1 at the next round
     }
     
-    cout << "f_1 c [B/2, 2*B) = " << f_1 << "\n";
+    cout << "f_1 c [B, 2B) = " << f_1 << "\n";
     
-    
+    // => f_1/2 * m c [B/2, B) for a known multiple f_1/2
     //////////////////////////////////////////////////////////////////////
     // STEP 2.
-    
 	mpz_class f_2 = (N + B) / B * f_1 / 2; // initialise f_2 using f_1 from the previous step
+    // f_2 = floor((N+B)/B)*f_1/2
     mpz_class f_2_exp;
     mpz_class c_2;
     code = -1;
@@ -156,42 +156,45 @@ void attack(char* argv2)
         mpz_powm(f_2_exp.get_mpz_t(), f_2.get_mpz_t(), e.get_mpz_t(), N.get_mpz_t()); // compute (f_2)^e (mod N)
         c_2 = f_2_exp * c_prime % N; // c_2 = (f_2)^e * c' (mod N)      
         code = interact(l_prime, c_2); // send c_2 to the oracle and get error code
-        interaction_number++;
+        interaction_number++; // increment number of interactions
         
         // break out of the loop and proceed to step 3.
+        // must occur at or before f_2 = ceil(2N/B) * f_1/2
         if (code != 1)
             break;
         
-        f_2 += f_1/2;
+        f_2 += f_1/2; // update f_2 = f_2 + f_1/2
     }
     
-    //cout << "f_2 = " << f_2 << "\n";
+    cout << "f_2 = " << f_2 << "\n";
     
     //////////////////////////////////////////////////////////////////////
     // STEP 3.
     
-    // m_min = ceil( n / f_2 )
+    // m_min = ceil(n / f_2)
     mpz_class m_min = (N + f_2 - 1)/f_2;
-    // m_max = floor( (n + B) / f_2 )
+    // m_max = floor((n + B) / f_2)
     mpz_class m_max = (N + B)/f_2;
+    
+    // f_2 * (m_max - m_min) ~ B
     
     mpz_class f_3, f_3_exp, c_3, f_tmp;
     mpz_class i_bound;
     
     while(m_min != m_max)
     {
-        f_tmp = 2*B / (m_max - m_min);        
-        i_bound = f_tmp * m_min / N;
-        f_3 = (i_bound * N + m_min - 1) / m_min;
+        f_tmp = 2*B / (m_max - m_min); // f_tmp = floor (2B/ (m_max - m_min))       
+        i_bound = f_tmp * m_min / N; // i = floor(f_tmp*m_min/N)
+        f_3 = (i_bound * N + m_min - 1) / m_min; // f_3 = ceil(i*N/m_min)
         
-        mpz_powm(f_3_exp.get_mpz_t(), f_3.get_mpz_t(), e.get_mpz_t(), N.get_mpz_t());
-        c_3 = f_3_exp * c_prime % N;
+        mpz_powm(f_3_exp.get_mpz_t(), f_3.get_mpz_t(), e.get_mpz_t(), N.get_mpz_t()); // compute (f_3)^e (mod N)
+        c_3 = f_3_exp * c_prime % N; // c_3 = (f_3)^e * c' (mod N)
         
-        code = interact(l_prime, c_3);
-        interaction_number++;
+        code = interact(l_prime, c_3); // send c_3 to the oracle and get error code
+        interaction_number++; // increment number of interactions
         
         if (code == 1)
-            m_min = (i_bound * N + B + f_3 - 1) / f_3;
+            m_min = (i_bound * N + B + f_3 - 1) / f_3; //
         else if (code == 2)
             m_max = (i_bound * N + B) / f_3;
     }
