@@ -11,8 +11,6 @@ int attack_raw[2];   // unbuffered communication: attack target -> attacker
 FILE* target_out = NULL; // buffered attack target input  stream
 FILE* target_in  = NULL; // buffered attack target output stream
 
-int bit_slack = 0;
-
 int interact(mpz_class &c, mpz_class &m, unsigned int &interaction_number);
 void attack(char* argv2);
 void attackR(char* argv2);
@@ -188,16 +186,17 @@ mpz_class vec_to_num(const vector<bool> &d)
     return d_num;
 }
 
-bool verify(const mpz_class &e, const mpz_class &N, const mpz_class &sk, unsigned int &interaction_number)
+// check whether the recovered key is the actual private key
+bool verify(const mpz_class &e, const mpz_class &N, const mpz_class &sk, unsigned int &interaction_number,
+            const mpz_class &c, mpz_class &m_prime)
 {
+    // m_prime holds the decrypted by the oracle message
+    // of c_vrfy = 0b1010
+    
     // decrypt ciphertext manually
-    mpz_class c = 0b1010;
-    mpz_class c_prime, m, m_prime;
+    mpz_class m;
     mpz_powm(m.get_mpz_t(), c.get_mpz_t(), sk.get_mpz_t(), N.get_mpz_t());
-    
-    // decrypt the same ciphertext with the oracle
-    interact(c, m_prime, interaction_number);
-    
+      
     // check if the two messages are the same
     if (m == m_prime)
         return true;
@@ -205,36 +204,42 @@ bool verify(const mpz_class &e, const mpz_class &N, const mpz_class &sk, unsigne
         return false;
 }
 
+// interacts with the target *****.D
+// send a ciphertext
+// get the decrypted message and the execution time
 int interact(mpz_class &c, mpz_class &m, unsigned int &interaction_number)
 {
     // interact with 61061.D
 	gmp_fprintf(target_in, "%0256ZX\n", c.get_mpz_t());
 	fflush(target_in);
     
-    // Print execution time
+    // get execution time
 	int time;
 	gmp_fscanf(target_out, "%d\n%ZX", &time, m.get_mpz_t());
-	//cout << dec << "Execution time: " << time << "\n";
     interaction_number++;
     return time;
 }
 
+// interacts with the target replica *****.R
+// send a ciphertext, a modulus and a private key
+// get the decrypted message and the execution time
 int calibrate(mpz_class &c, mpz_class &N, mpz_class &d, mpz_class &m)
 {
-    //cout << "In calibrate" << endl;
     // interact with 61061.R
 	gmp_fprintf(target_in, "%0256ZX\n%0256ZX\n%0256ZX\n", c.get_mpz_t(), N.get_mpz_t(), d.get_mpz_t());
-    //cout << "Before flush" << endl;
 	fflush(target_in);
-    //cout << "After flush" << endl;
     
-    // Print execution time
+    // get execution time
 	int time;
 	gmp_fscanf(target_out, "%d\n%ZX", &time, m.get_mpz_t());
-	cout << dec << "Execution time: " << time << "\n";
     return time;
 }
 
+// test function to obtain times for different key from
+// the target replica
+// used to compute the time needed for a single Montgomery
+// multiplication which helps find the 
+// number of bits + hamming weight
 void attackR(char* argv2)
 {
     // interact with 61061.conf
@@ -243,11 +248,13 @@ void attackR(char* argv2)
 	mpz_class N, e;
 	config >> hex >> N >> e;
     
-    // declare variables for communication with the target
+    // declare variables for communication with the target replica
     mpz_class c = 0b00, m, d;
     int time, time1, time2, time3, time4, time5, time6, time7;
     vector<int> times;
     
+    // try the target replica with different keys
+    // investigate the results and the differences between them
     d = 0b1001;
     time1 = calibrate(c, N, d, m);
     cout << "Time for d = 1001: " << time1 << endl;
@@ -295,6 +302,9 @@ void attackR(char* argv2)
     
 }
 
+
+// function executing the actual attack on the target
+// called from main
 void attack(char* argv2)
 {
     // count the number of interactions with the target
@@ -309,6 +319,11 @@ void attack(char* argv2)
 	mpz_class N, e;
 	config >> hex >> N >> e;
     
+    // initialise verification variables
+    mpz_class c_vrfy = 0b1010, m_vrfy;
+    interact(c_vrfy, m_vrfy, interaction_number); 
+    // decrypt the ciphertext with the oracle
+    
     // execution times for the initial sample set of ciphertexts
     vector<int> times;
     
@@ -319,11 +334,16 @@ void attack(char* argv2)
     // time it takes to do a single Montgomery multiplication
     // got from 61061.R
     int time_op = 3770, time_overhead = 2*time_op;
-    // get execution time
+    
+    // get execution time: time it takes the targer to decrypt 
+    // a ciphertext with the private key we aim to recover
     int time_ex = interact(c, m, interaction_number);
-    // No of (bits + bits set)
-    int bits_num = (time_ex - time_overhead)/time_op + bit_slack;
-    cout << "Upper bound on bits: " << bits_num << endl;
+    
+    // No of (bits in key + hamming weight)
+    int bits_num = (time_ex - time_overhead)/time_op;
+    cout << "No. of bits + Hamming weight: " << bits_num << "\n";
+    // for each bit = 0 recovered, 1 will be subtracted,
+    // for each bit = 1 recovered, 2 will be subtracted
     
     // vectors of ciphertexts
     vector<mpz_class> cs;
@@ -340,12 +360,14 @@ void attack(char* argv2)
     
     // d is the private key
     vector<bool> d;
+    
+    // initial number of samples
     int oracle_queries = 2000;
     
     // initial sample set and respective execution times
     for (int j = 0; j < oracle_queries; j++)
     {
-        // compute a random ciphertexts
+        // compute a random ciphertext
         c = randomness.get_z_range(N);
         // find the time needed to decrypt it
         time_c = interact(c, m, interaction_number);
@@ -383,31 +405,43 @@ void attack(char* argv2)
     // mpz integer to hold the private key once recovered
     mpz_class sk;
     
+    // until the key is fully recovered, attack
     while (!isKey)
     {
+        // each time the program needs to backtrack too many times
+        // additional 250 random ciphertexts are generated
+        // and the key is attacked from the beginning
         if (doResample)
         {
             // add 250 more samples
             cout << "RESAMPLING\n";
             for (int j = 0; j < 250; j++)
             {
+                // compute a random ciphertext
                 c = randomness.get_z_range(N);
+                // find the time needed to decrypt it
                 time_c = interact(c, m, interaction_number);
+                
+                // convert the ciphertext to a montgomery number
+                // for the target simulation
                 c = montgomery_number(c, rho_sq, omega, N);
+                // save the current ciphertext
                 cs.push_back(c);
+                // and its execution time
                 times.push_back(time_c);
+                
+                // compute the square
                 c = montgomery_multiplication(c, c, omega, N);
                 
-                // will be used when prev d_i = 1
-                part_cs_mul_sq[0].push_back(c);
-                
-                part_cs_sq[0].push_back(0);
+                // vectors for partial exponentiations
+                part_cs_mul_sq[0].push_back(c); // will be used when previous d_i = 1
+                part_cs_sq[0].push_back(0);     // will be used when previous d_i = 0
             }
 
             // clear all variables and start guessing the key again
-            oracle_queries += 250;
-            fill(isFlipped.begin(), isFlipped.end(), false);
-            bit_i = 0;
+            oracle_queries += 250; // update the counter
+            fill(isFlipped.begin(), isFlipped.end(), false); // flipped bits vector
+            bit_i = 0; // bit counter
             bits_num = (time_ex - time_overhead)/time_op - 2; // -2 as d starts with a 1
             d.clear(); // clear all guesses
             d.push_back(1); // push first bit 1
@@ -420,7 +454,6 @@ void attack(char* argv2)
         
         /////////////////////////////////////////////////////////////
         // confidence measures - average calculations for hypotheses
-        
         // case for bit is 1
         // time1 - no reduction; time1red - had reduction
         long long time1 = 0, time1red = 0;
@@ -438,7 +471,7 @@ void attack(char* argv2)
             mpz_class x, prev_x;
             
             // obtain the time it took to decrypt the current
-            // ciphertext using the target
+            // ciphertext with the target
             int current_time = times[j];
             
             // get partial exponentiation based on previous bit
@@ -535,6 +568,7 @@ void attack(char* argv2)
         if(abs(abs(time1-time1red) - abs(time0-time0red)) > 6 && bits_num > 0)
         {
             // check which bit should be predicted based on confidence measures
+            // and update the number of bits left to recover (bits_num)
             if (abs(time1-time1red) > abs(time0-time0red))
             {
                 // predict 1
@@ -615,7 +649,7 @@ void attack(char* argv2)
             // convert the vector of bits to an mpz integer
             sk = vec_to_num(d);
             // check if it's the right private key
-            isKey = verify(e, N, sk, interaction_number);
+            isKey = verify(e, N, sk, interaction_number, c_vrfy, m_vrfy);
         }
     }
     
