@@ -85,7 +85,7 @@ int interact(const mpz_class &l_prime, const mpz_class &c_prime)
 
     //       code 0: decryption success 
     // error code 1: y >= B
-    // error code 2: y < B (?)
+    // error code 2: y < B
     
     // return error code
 	int code;
@@ -115,8 +115,12 @@ void attack(char* argv2)
     mpz_class B;
     mpz_powm_ui(B.get_mpz_t(), mpz_class(2).get_mpz_t(), 8*(k - 1), N.get_mpz_t());
     
+    // abort if condition does not hold
     if (2*B >= N)
-        abort();    
+    {
+        cout << "Error: 2*B >= N\n";
+        return;
+    }        
  
     //////////////////////////////////////////////////////////////////////
     // ATTACK                                                           //
@@ -140,8 +144,6 @@ void attack(char* argv2)
         i++; // increment exponent for updating f_1 at the next round
     }
     
-    cout << "f_1 c [B, 2B) = " << f_1 << "\n";
-    
     // => f_1/2 * m c [B/2, B) for a known multiple f_1/2
     //////////////////////////////////////////////////////////////////////
     // STEP 2.
@@ -164,10 +166,7 @@ void attack(char* argv2)
             break;
         
         f_2 += f_1/2; // update f_2 = f_2 + f_1/2
-    }
-    
-    cout << "f_2 = " << f_2 << "\n";
-    
+    }    
     //////////////////////////////////////////////////////////////////////
     // STEP 3.
     
@@ -194,19 +193,20 @@ void attack(char* argv2)
         interaction_number++; // increment number of interactions
         
         if (code == 1)
-            m_min = (i_bound * N + B + f_3 - 1) / f_3; //
+            m_min = (i_bound * N + B + f_3 - 1) / f_3; // m_min = ceil((i*N + B)/f_3)
         else if (code == 2)
-            m_max = (i_bound * N + B) / f_3;
+            m_max = (i_bound * N + B) / f_3; // m_max = floor((i*N + B)/f_3)
     }
     
     mpz_class c_check;
     mpz_powm(c_check.get_mpz_t(), m_min.get_mpz_t(), e.get_mpz_t(), N.get_mpz_t());
     
     if (c_check == c_prime)
-        cout << "MOO WINS!!!" << endl;
+        cout << "OAEP message is recovered successfully!\n\n";
     
+    // get the number of bytes of the message
+    size_t sizeinbase = mpz_sizeinbase(m_min.get_mpz_t(), 256);
     
-    size_t sizeinbase = mpz_sizeinbase(m_min.get_mpz_t(), 256); 
     //holder for the byte array
     unsigned char buffer[128] = {0}, bufferL[128] = {0};
     
@@ -214,18 +214,18 @@ void attack(char* argv2)
     // have the behaviour of I2OSP
     mpz_export(buffer + 128 - sizeinbase, NULL, 1, 1, 0, 0, m_min.get_mpz_t());
     
-    cout << "Message (tagged and masked) = ";
+    cout << "OAEP message:\n";
     for (int j = 0; j < 128; j++)
         printf("%02X", (unsigned int)buffer[j]);
     
-    cout << endl;
-    cout << endl;
+    cout << "\n\n";
     
     //////////////////////////////////////////////////////////////////////
     // EME-OAEP Decoding                                                //
     //////////////////////////////////////////////////////////////////////
     
     // 3. a.
+    // compute lHash of size hLen = SHA_DIGEST_LENGTH: lHash = Hash(L)
     // convert l_prime to byte array
     sizeinbase = mpz_sizeinbase(l_prime.get_mpz_t(), 256);
     mpz_export(bufferL, NULL, 1, 1, 0, 0, l_prime.get_mpz_t());
@@ -233,46 +233,30 @@ void attack(char* argv2)
     // digest for l_prime
     unsigned char lHash[SHA_DIGEST_LENGTH];
  
-    // hash the label, store in lHash
+    // hash the label
     SHA1(bufferL, sizeinbase, lHash);
     
-    cout << "lHash = ";
-    for (int j = 0; j < SHA_DIGEST_LENGTH; j++)
-        printf("%02X", (unsigned int)lHash[j]);
-    
-    cout << endl;
-    
     // 3. b.
+    // separate the encoded message: EM = Y || maskedSeed || maskedDB
     unsigned char Y = buffer[0];
-    printf("Y = %02X", Y);
-    cout << endl;
     
-    cout << "maskedSeed = ";
+    // maskedSeed is of length hLen = SHA_DIGEST_LENGTH
     unsigned char maskedSeed[SHA_DIGEST_LENGTH];
     for (int j = 0; j < SHA_DIGEST_LENGTH; j++)
         maskedSeed[j] = buffer[j+1];
-    for (int j = 0; j < SHA_DIGEST_LENGTH; j++)
-        printf("%02X", (unsigned int)maskedSeed[j]);
-    cout << endl;
     
-    cout << "maskedDB = ";
+    // maskedDB is of length k - hLen - 1
     unsigned char maskedDB[k - SHA_DIGEST_LENGTH - 1];
     for (int j = 0; j < k - SHA_DIGEST_LENGTH - 1; j++)
         maskedDB[j] = buffer[j+SHA_DIGEST_LENGTH+1];
-    for (int j = 0; j < k - SHA_DIGEST_LENGTH - 1; j++)
-        printf("%02X", (unsigned int)maskedDB[j]);
-    cout << endl;
     
     // 3. c.
-    cout << "seedMask =   ";
+    // seedMask = MGF(maskedDB, hLen)
     unsigned char seedMask[SHA_DIGEST_LENGTH];
     PKCS1_MGF1(seedMask, SHA_DIGEST_LENGTH, maskedDB, k - SHA_DIGEST_LENGTH - 1, EVP_sha1());
-    for (int j = 0; j < SHA_DIGEST_LENGTH; j++)
-        printf("%02X", seedMask[j]);
-    cout << endl;
     
     // 3. d.
-    cout << "seed = ";
+    // seed = maskedSeed xor seedMask
     unsigned char seed[SHA_DIGEST_LENGTH];
 
     {
@@ -286,28 +270,17 @@ void attack(char* argv2)
             if (seedMask[l] != 0)
                 break;
         
-        /*    
-        if (j > l)
-            l = j;
-        */
         for (; r < SHA_DIGEST_LENGTH && l < SHA_DIGEST_LENGTH&& j < SHA_DIGEST_LENGTH; r++, l++, j++)
             seed[r] = maskedSeed[j] ^ seedMask[l];
-
-        for (r = 0; r < SHA_DIGEST_LENGTH; r++)
-            printf("%02X", (unsigned int)seed[r]);
-        cout << endl;
     }
     
     // 3. e.
-    cout << "dbMask = ";
+    // dbMask = MGF(seed, k - hLen - 1)
     unsigned char dbMask[k - SHA_DIGEST_LENGTH - 1];
     PKCS1_MGF1(dbMask, k - SHA_DIGEST_LENGTH - 1, seed, SHA_DIGEST_LENGTH, EVP_sha1());
-    for (int j = 0; j < k - SHA_DIGEST_LENGTH - 1; j++)
-        printf("%02X", (unsigned int)dbMask[j]);
-    cout << endl;
     
     // 3. f.
-    cout << "DB = ";
+    // DB = maskedDB xor dbMask
     unsigned char DB[k - SHA_DIGEST_LENGTH - 1];
     {
         int j = 0, l = 0, r = 0;
@@ -320,77 +293,41 @@ void attack(char* argv2)
             if (dbMask[l] != 0)
                 break;
         
-       /*
-        if (j > l)
-            l = j;*/
-        
         for (; j < k - SHA_DIGEST_LENGTH - 1 && l < k - SHA_DIGEST_LENGTH - 1 ; r++, l++, j++)      
             DB[r] = maskedDB[j] ^ dbMask[l];
         
         for (int j = r; j < k - SHA_DIGEST_LENGTH - 1; j++)
-            DB[j] = 0;
-        
-        for (int j = 0; j < r; j++)
-            printf("%02X", (unsigned int)DB[j]);
-        cout << endl;
-        cout << endl;    
+            DB[j] = 0;  
     }
     
     // 3. g.
-    cout << "lHash_prime = ";
+    // separate DB = lHash' || PS || 0x01 || M
+    // lHash' of length hLen = SHA_DIGEST_LENGTH
+    // PS - octets with 0x00
+    // M - the message
     unsigned char lHash_prime[SHA_DIGEST_LENGTH];
     for (int j = 0; j < SHA_DIGEST_LENGTH; j++)
         lHash_prime[j] = DB[j];
     
-    if (bufferL == lHash_prime)
-        cout << "YEAH\n";
-    for (int j = 0; j < SHA_DIGEST_LENGTH; j++)
-        printf("%02X", DB[j]);
-    
+    // iterate through 0-s until 1 is reached
     int j = SHA_DIGEST_LENGTH;
     for (; j < k - SHA_DIGEST_LENGTH - 1; j++)
         if (DB[j] == 1)
             break;
-        
-    cout << endl << endl;
     
+    // obtain the message
     unsigned char message[k - SHA_DIGEST_LENGTH - 2 - j];
     for (int l = j + 1, i = 0; l < k - SHA_DIGEST_LENGTH - 1 && i < k - SHA_DIGEST_LENGTH - 2 - j; l++, i++)
         message[i] = (unsigned int)DB[l];
-        //printf("%02X", (unsigned int)DB[l]);
     
+    // print the recovered message
     cout << "Recovered message:\n";
     for (int i = 0; i < k - SHA_DIGEST_LENGTH - 2 - j; i++)
         printf("%02X", (unsigned int)message[i]);
-    cout << endl;
+    cout << "\n\n";
     
-    cout << "Number of interactions with the target:\n" << interaction_number << endl;
-/*    unsigned char c_check2[128];
-    
-    unsigned char e_check[128];
-    unsigned char n_check[128];
-    size_t size_e = mpz_sizeinbase(e.get_mpz_t(), 256);
-    size_t size_n = mpz_sizeinbase(N.get_mpz_t(), 256);
-    mpz_export(e_check, NULL, 1, 1, 0, 0, e.get_mpz_t());
-    mpz_export(n_check, NULL, 1, 1, 0, 0, N.get_mpz_t());
-    
-    RSA *rsa;
-    rsa = RSA_new();
-    rsa->e = BN_bin2bn(e_check, 128, rsa->e);
-    cout << e << endl;
-    cout << &rsa->e << endl;
-    rsa->n = BN_bin2bn(n_check, 128, rsa->n);
-    //RSA_generate_key_ex(e_rsa, 1024, &e_convert, NULL);
-    
-    RSA_public_encrypt(k - SHA_DIGEST_LENGTH - 2 - j, message, c_check2, rsa, RSA_PKCS1_OAEP_PADDING);
-    RSA_free(rsa);
-    
-    cout << endl << "c_check  = " << c_prime;
-    cout << endl << mpz_sizeinbase(c_prime.get_mpz_t(), 256);
-    
-    cout << endl << "c_check2 = ";
-    for (int i = 0; i < 128; i++)
-        cout << (unsigned int) c_check2[i];*/
+    cout << "Number of interactions with the target: " << interaction_number << "\n\n";
+
 }
 
 

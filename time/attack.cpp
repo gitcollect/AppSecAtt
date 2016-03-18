@@ -341,7 +341,7 @@ void attack(char* argv2)
     
     // No of (bits in key + hamming weight)
     int bits_num = (time_ex - time_overhead)/time_op;
-    cout << "No. of bits + Hamming weight: " << bits_num << "\n";
+    cout << "\nNo. of bits + Hamming weight: " << bits_num << "\n\n";
     // for each bit = 0 recovered, 1 will be subtracted,
     // for each bit = 1 recovered, 2 will be subtracted
     
@@ -556,13 +556,6 @@ void attack(char* argv2)
         if (time0red_count != 0)
             time0red = time0red/time0red_count;
         
-        cout << " time1 = " << time1;
-        cout << " time1red = " << time1red;
-        cout << " time0 = " << time0;
-        cout << " time0red = " << time0red;
-        cout << " Diff = " << abs(abs(time1-time1red) - abs(time0-time0red));
-        cout << " backtracks = " << backtracks;
-
         // check if confidence measure is high enough
         // second check ensures there are still bits to be recovered
         if(abs(abs(time1-time1red) - abs(time0-time0red)) > 6 && bits_num > 0)
@@ -573,14 +566,12 @@ void attack(char* argv2)
             {
                 // predict 1
                 d.push_back(1);
-                cout << " d = 1\n";
                 bits_num-=2;  
             }
             else
             {
                 // predict 0
                 d.push_back(0);
-                cout << " d = 0\n";
                 bits_num--;
             }
             

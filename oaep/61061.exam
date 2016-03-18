@@ -6,8 +6,18 @@ Q.1 Consider an example where N = 551, e = 5, d = 101 and c = 243.  Using
     B = 2^(8(k-1)) mod N = 256
     All valid ciphertexts are in the range [0; B) which holds for c = 243.
     The Manger attack works when 2B < N, which holds for the example values.
+    In general, modified ciphertexts are sent to the oracle/target to obtain
+    information about the underlying message until it is recovered. This is 
+    possible due to RSA's malleable property. The information obtained is: 
+        code 0: the ciphertext decrypts (hence the message has been recovered)
+        error code 1: c >= B
+        error code 2: c < B
+    Hence, at each step of the attack, the range in which the message is lying
+    is reduced further.
     
     Step 1.
+        f_1 is doubled after each iteration until error code 1 - c >= B - is 
+        returned (c is the ciphertext sent to the target).
         1) f_1 = 2     send f_1^e * c (mod N) = 62
            From oracle: c^d (mod N) = m     62^101 (mod 551) = 6    6 < B
             => err code 2   f_1 = 4
@@ -15,17 +25,27 @@ Q.1 Consider an example where N = 551, e = 5, d = 101 and c = 243.  Using
            f_1 = 128   send f_1^e * c (mod N) = 74
            From oracle: 74^101 (mod 551) = 384      384 > B
             => err code 1 => move onto Step 2.
+            => f_1 is in range [B; 2*B)
+               f_1/2 * m is in range [B/2; B)
+               64*m is in range [128; 256)
+               m is in range [2; 4)
     Step 2.
+        f_2 is increased by f_1/2 until error code 2 - c < B - is returned
+        (c is the ciphertext sent to the target).
         f_2 = floor((N + B) / B) * f_1/2    f_2 = 192
         1) f_2 = 192   send f_2^e * c (mod N) = 4
             From oracle: 4^101 (mod 551) = 35   35 < B
              => err code 2 => move onto Step 3.
+             => f_2 * m is in range [N; N+B)
+                192*m is in range [551; 807)
+                m is in range [3; 4.2)
     Step 3.
         range [m_min; m_min) of possible m values, where
         m_min = ceil(N/f_2) = 3
         m_max = floor((N + B)/ f_2) = 4
-            while it can be seen the recovered m is 3, the working principle
-            is as follows:
+            While it can be seen the recovered m is 3, the working principle
+            is similar to a binary search until m_min = m_max = m, and works
+            as follows:
             f_tmp = floor(2B/(m_max - m_min)) = 512
             i = floor(f_tmp * m_min / N) = 2
             f_3 = ceil(i*N/m_min) = 368     send f_3^e * c (mod N) = 32
@@ -37,7 +57,7 @@ Q.1 Consider an example where N = 551, e = 5, d = 101 and c = 243.  Using
     Check: (m^e)^d = m (mod N) and m^e = c (mod N)
            (3^5)^101 = 3 (mod 551) holds
            3^5 = 243 (mod 551) holds
-    SOLVED, TO WRITE HERE
+           Hence, the message has been recovered correctly.
     
 Q.2 To prevent the attack, the vendor suggests altering the software: the
     idea is that no matter what error occurs, the same error code will be
@@ -46,7 +66,7 @@ Q.2 To prevent the attack, the vendor suggests altering the software: the
     
     RFC, section 7.1.2 outlines that the target returns "decryption error"
     (and nothing more specific) if such occurs. This makes the scheme immune
-    to Manger's attack (implemented in the following version 2.2). However,
+    to Manger's attack and was implemented in the following version 2.2. However,
     in case the error message is returned as soon as a decryption error occurs,
     the system would still be vulnerable to timing attacks.
     
@@ -66,8 +86,6 @@ Q.6 RSA has a homomorphic property: explain what this means, and how it
     reflected in the message. While the oracle does not decrypt the ciphertext
     (in which case the attack will be straightforward), the error code returned
     allows for an informed decision about the next modification of the ciphertext.
-
-    (Crypto slides and wiki)
     
 Q.7 Side-channel attacks are often categorised as being either simple or
     differential: how would categorise this attack, and why?

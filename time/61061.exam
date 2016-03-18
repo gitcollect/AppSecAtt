@@ -44,9 +44,6 @@ Q.2 Let n denote the number of simulated clock cycles required to execute a
     commences, and reducing it to a normal integer afterwards. Both these algorithms
     involve a Montgomery multiplication, hence the overhead in question is just two
     more Montgomery multiplications. n = 3770
-    //Therefore, once the whole execution time is given by the target, it can be divided
-    //by 3770-80 to obtain the number of Montgomery multiplications. In my case this 
-    //number is: n = 98.
 
     
 Q.7 Numerous factors might produce noise within measurements of execution
@@ -55,8 +52,6 @@ Q.7 Numerous factors might produce noise within measurements of execution
     
     Memory (RAM) temperature, network latency and cache hit and miss can all
     affect execution time for decryption.
-
-    (Cache attack https://eprint.iacr.org/2011/557.pdf )
     
     
 Q.8 The level of noise, n, within measurements of execution time will
@@ -67,10 +62,6 @@ Q.8 The level of noise, n, within measurements of execution time will
     Assume an example case where a level of noise n requires m measurements. If another 
     case has a level of noise 2n, then 4m measurements will be required. In general, the
     number of measurements required increases as the square of the noise level. [1][2]
-    
-    However, in the general case, the number m is dependent on the choice of statistical
-    model - one can simply average the execution times for all samples, or could use a more
-    sophisticated approach (Monte Carlo bootstraping).
     
     [1] http://gauss.ececs.uc.edu/Courses/c653/lectures/SideC/intro.pdf
     [2] http://courses.csail.mit.edu/6.857/2006/handouts/TimingAttacks.pdf
