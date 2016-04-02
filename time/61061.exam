@@ -13,15 +13,15 @@ Q.1 The vendor of the attack target is concerned that news of this attack
         4. compute M = C^d (mod N)
         5. compute m = M/r (mod N)
     This works as:
-       M/r = C^d/r = (cq)^d/r = (x^d)(q^d)/r = (x^d)r/r = x^d (mod N).
+       M/r = C^d/r = (cq)^d/r = (c^d)(q^d)/r = (c^d)r/r = c^d (mod N).
     Using this process makes it hard for the attacker to learn anything 
     about the private key d. [1]
     3) Software/Hardware - parallelise the algorithms (and create confusion),
     however, timing attacks are still possible.
-    4) Chinese Remainder Theorem instead of Square-And-Multiply - inefficacious
+    4) Chinese Remainder Theorem instead of Square-And-Multiply - ineffective
     if the attacker can exploit intermediate values in the initial reduction
-    of c mod p and c mod q; the final (combination) step of the CRT can also be
-    exploited.
+    of c mod p and c mod q; the final (combination) step of the CRT can also
+    be exploited.
     
     I would personally recommend the second approach.
     
@@ -33,7 +33,7 @@ Q.2 Let n denote the number of simulated clock cycles required to execute a
      _____________________________________________________
     |       |  c^d  | Operations needed | Exectution time |
     |_______|_______|___________________|_________________|
-    | c = 0 |  c^1  |     mul + sq      |     15 123      |
+    | c = 0 |  c^01 |     mul + sq      |     15 123      |
     |       |  c^10 |     mul + 2sq     |     18 892      |
     
     Both mul and sq are executed using Montgomery multiplication, and hence
@@ -43,7 +43,8 @@ Q.2 Let n denote the number of simulated clock cycles required to execute a
     time needed to convert the ciphertext to a Montgomery number before decryption
     commences, and reducing it to a normal integer afterwards. Both these algorithms
     involve a Montgomery multiplication, hence the overhead in question is just two
-    more Montgomery multiplications. n = 3770
+    more Montgomery multiplications. n = 3770 worked well in my implementation of
+    the attack.
 
     
 Q.7 Numerous factors might produce noise within measurements of execution
@@ -61,7 +62,7 @@ Q.8 The level of noise, n, within measurements of execution time will
     
     Assume an example case where a level of noise n requires m measurements. If another 
     case has a level of noise 2n, then 4m measurements will be required. In general, the
-    number of measurements required increases as the square of the noise level. [1][2]
+    number of measurements required increases with the square of the noise level. [1][2]
     
     [1] http://gauss.ececs.uc.edu/Courses/c653/lectures/SideC/intro.pdf
     [2] http://courses.csail.mit.edu/6.857/2006/handouts/TimingAttacks.pdf
