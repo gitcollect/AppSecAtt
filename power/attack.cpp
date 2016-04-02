@@ -107,8 +107,6 @@ void attack(char* argv2)
     mpz_class c, m;
     vector<int> current_power;
     int oracle_queries = 1000;
-    mpz_class N = 1;
-    N = N<<8*16;
     
     // produce random messages
     gmp_randclass randomness (gmp_randinit_default);
