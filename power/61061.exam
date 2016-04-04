@@ -3,14 +3,48 @@ Q.1 As a security consultant, you have been working on a prototype of the
     make any alteration necessary (in software or hardware) to prevent the
     attack.  Explain the options available, and which one you would
     recommend.
+    
+    Blinding
+    Adding noise
+    Adding redundant code
+    
+    Masking
+    Hiding
+    
 Q.2 Your implementation of this attack will target some operation during
     execution of AES.  Identify which operation you target, and explain
     why.  Outline other operation(s) you could have targeted, and why they
     might be a better or worse choice.
+    
+    The implementation in attack.cpp targets the Byte Substitution 
+    (SubBytes) function. It is a good DPA target as it is highly non-linear
+    which facilitates the distinguishability of the correct key hypothesis.
+    Alternatively, ShiftRows, MixColumns and AddRoundKey could all be 
+    targeted. However, the function output of all three is a linear 
+    transformation of the input, hence, they will be a worse choice.
+    
 Q.5 DPA attacks work because statistics can (to some degree) remove the
     noise within power consumption traces.  Explain the concepts of signal,
     noise and signal-to-noise ratio, and the role each has in a DPA attack
     of this type.
+    
+    The power consumption of a point consists of:
+        P_total = P_op + P_data + P_el.noise + P_const
+    Signal is described by P_op and P_data, and is (partially) exploitable
+    by the attacker.
+    Noise is described by P_el.noise and is not exploitable by the 
+    attacker.
+    (P_const represents all constant components of P_op, P_data, and 
+    P_el.noise.)
+    If the part of P_op and P_data that is exploited in the attack is called 
+    P_exp and the remaining part - P_sw.noise:
+        P_total = P_exp + P_sw.noise + P_el.noise + P_const
+    Therefore, the signal-to-noise ratio SNR = Var(P_exp)/Var(P_noise).
+    The more noise there is, the more power traces are needed for the attack
+    to be executed. More specifically, the relation between signal and noise
+    is quadratic: if we double the noise, 4 times more traces will need to 
+    be measured.
+    
 Q.6 DPA attacks include a statistical analysis step, for which one option
     is use of the t-test.  Explain what the difference between a standard
     t-test and Kocher's method is.  Given that in a DPA attack one might
