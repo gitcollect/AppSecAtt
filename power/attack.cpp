@@ -182,7 +182,7 @@ void attack(char* argv2)
     mpz_class c, m;
     vector<int> current_power;
     vector<mpz_class> messages;
-    int oracle_queries = 15;
+    int oracle_queries = 13;
     
     // produce random messages
     gmp_randclass randomness(gmp_randinit_default);
@@ -266,9 +266,11 @@ void attack(char* argv2)
         key[n] = max_j;
     }
     
+    cout << "\nRecovered key: ";
     for (int n = 15; n >= 0; n--)
         printf("%02X", key[n]);
     
+    cout << "\nKey check:\n";
     std::reverse(begin(key), end(key));
     
     unsigned char t[16];
@@ -284,12 +286,6 @@ void attack(char* argv2)
     AES_KEY rk;
     AES_set_encrypt_key(key.data(), 128, &rk);
     AES_encrypt(m_char, t, &rk);  
-    cout << endl;
-    for (unsigned char c : t)
-        printf("%02X", c); 
-    cout << endl;    
-    for (unsigned char c : c_char)
-        printf("%02X", c);
 
     if(!memcmp(t, c_char, 16))
         printf("\nAES.Enc( k, m ) == c\n");
