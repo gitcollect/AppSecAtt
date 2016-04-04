@@ -10,9 +10,8 @@
 #include  <fcntl.h>
 #include  <gmpxx.h>
 #include  <fstream>
-#include  <openssl/sha.h>
-#include  <openssl/evp.h>
-#include  <openssl/rsa.h>
+#include  <algorithm>
+#include  <openssl/aes.h>
 #include  <X11/Xlib.h>
 
 #endif

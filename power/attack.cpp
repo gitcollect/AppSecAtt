@@ -129,9 +129,12 @@ vector<int> interact(mpz_class &m, mpz_class &c, unsigned int &interaction_numbe
 	int length;
 	gmp_fscanf(target_out, "%d", &length);
     
-    vector<int> current_power(length);
-    for (int i = 0; i < length; i++)
+    // only need the first 10% of a power
+    // and ignore the rest of the input
+    vector<int> current_power(length/10);
+    for (int i = 0; i < length/10; i++)
         gmp_fscanf(target_out, ",%d", &current_power[i]);
+    gmp_fscanf(target_out, "%*[^\n]");
     
     gmp_fscanf(target_out, "%ZX", c.get_mpz_t());
     interaction_number++;
@@ -179,7 +182,7 @@ void attack(char* argv2)
     mpz_class c, m;
     vector<int> current_power;
     vector<mpz_class> messages;
-    int oracle_queries = 100;
+    int oracle_queries = 15;
     
     // produce random messages
     gmp_randclass randomness(gmp_randinit_default);
@@ -204,42 +207,95 @@ void attack(char* argv2)
         if (powers[j].size() < min)
             min = powers[j].size();
     
-    
     vector< vector<int> > powers_T(min, vector<int> (powers.size()));   //the 'transposed' vector
     for (int j = 0; j < min; j++)  
         for (int l = 0; l < powers.size(); l++)
 	        powers_T[j][l] = powers[l][j];
-
-    
-    vector< vector<int> > target(messages.size(), vector<int> (256));
-    vector< vector<int> > target_T(256, vector<int> (messages.size()));
-    
+        
+    vector<unsigned char> key(16);
+   
     // recover 1 byte of the key at the time: 
     // 1 byte of the key corresponds to 1 byte of the message in AES
+    #pragma omp parallel for
     for (int n = 0; n < 16; n++)
     {
+        vector< vector<int> > target   (messages.size(), vector<int> (256));
+        vector< vector<int> > target_T (256, vector<int> (messages.size()));
+
         for (int j = 0; j < messages.size(); j++)
         {
             mpz_class temp = messages[j] >> (8*n);
             int current_byte = temp.get_si() & 0xff;
             // bitxor each byte of each message with each possible value for the key
-            for (int key = 0; key < 256; key++)
+            for (int k = 0; k < 256; k++)
                 // Differential part of DPA: XOR -> SBox -> Hamming Weight
-                target[j][key] = HammingWeight[SubBytes[current_byte ^ key]];
+                target[j][k] = HammingWeight[SubBytes[current_byte ^ k]];
         }
         
+        // transpose target into target_T
         for (int j = 0; j < 256; j++)  
             for (int l = 0; l < target.size(); l++)
                 target_T[j][l] = target[l][j];
         
+        vector< vector<float> > corr_mat (256, vector<float> (powers_T.size()));
         for (int j = 0; j < 256; j++)
         {
-            if (powers_T[j].size() != target_T[j].size())
-                continue;
-            
-            cout << "\n corrcoef = " << corrcoef(target_T[j], powers_T[j]);
+            for (int l = 0; l < powers_T.size(); l++)
+            {
+                if (powers_T[l].size() != target_T[j].size())
+                    continue;
+                
+                corr_mat[j][l] = corrcoef(target_T[j], powers_T[l]);
+            }
         }
+        
+        float max_abs = -2;
+        int max_j = -1;
+        for (int j = 0; j < 256; j++)
+        {
+            for (int l = 0; l < powers_T.size(); l++)
+            {
+                if(abs(corr_mat[j][l]) > max_abs)
+                {
+                    max_abs = abs(corr_mat[j][l]);
+                    max_j = j;
+                }
+            }
+        }
+        
+        key[n] = max_j;
     }
+    
+    for (int n = 15; n >= 0; n--)
+        printf("%02X", key[n]);
+    
+    std::reverse(begin(key), end(key));
+    
+    unsigned char t[16];
+
+    //holder for the byte array
+    unsigned char m_char[16] = {0}, c_char[16] = {0};
+    
+    // convert m_min from mpz_class to a byte array
+    // have the behaviour of I2OSP
+    mpz_export(m_char, NULL, 1, 1, 0, 0, m.get_mpz_t());
+    mpz_export(c_char, NULL, 1, 1, 0, 0, c.get_mpz_t());
+    
+    AES_KEY rk;
+    AES_set_encrypt_key(key.data(), 128, &rk);
+    AES_encrypt(m_char, t, &rk);  
+    cout << endl;
+    for (unsigned char c : t)
+        printf("%02X", c); 
+    cout << endl;    
+    for (unsigned char c : c_char)
+        printf("%02X", c);
+
+    if(!memcmp(t, c_char, 16))
+        printf("\nAES.Enc( k, m ) == c\n");
+    else
+        printf("\nAES.Enc( k, m ) != c\n");
+    
     cout << "\nNumber of interactions with the target: " << interaction_number << "\n\n";
 
 }
