@@ -11,7 +11,7 @@ int attack_raw[2];   // unbuffered communication: attack target -> attacker
 FILE* target_out = NULL; // buffered attack target input  stream
 FILE* target_in  = NULL; // buffered attack target output stream
 
-// AES SubBytes
+// AES SubBytes look-up table
 unsigned char SubBytes[256] = 
 {
     0x63, 0x7C, 0x77, 0x7B, 0xF2, 0x6B, 0x6F, 0xC5, 0x30, 0x01, 0x67, 0x2B, 0xFE, 0xD7, 0xAB, 0x76,
@@ -32,6 +32,7 @@ unsigned char SubBytes[256] =
     0x8C, 0xA1, 0x89, 0x0D, 0xBF, 0xE6, 0x42, 0x68, 0x41, 0x99, 0x2D, 0x0F, 0xB0, 0x54, 0xBB, 0x16
 };
 
+// Look-up table for the Hamming Weight of all possible bytes 0 to 255
 int HammingWeight[256] =
 {
     0, 1, 1, 2, 1, 2, 2, 3, 1, 2, 2, 3, 2, 3, 3, 4,
@@ -141,6 +142,7 @@ vector<int> interact(mpz_class &m, mpz_class &c, unsigned int &interaction_numbe
     return current_power;
 }
 
+// Straight-forward mean fucntion used in the corrcoef function
 float mean(vector<int> trace)
 {
     float sum = 0;
@@ -152,6 +154,8 @@ float mean(vector<int> trace)
 }
 
 // http://www.alglib.net/statistics/correlation.php
+// Pearson Product-Moment Correlation a.k.a. 
+// Pearson's correlation coefficient
 float corrcoef(vector<int> x, vector<int> y)
 {
     // initialise: sum_xy is at the top, the other two - at the bottom

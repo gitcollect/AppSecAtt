@@ -266,7 +266,7 @@ void interact(string fault, mpz_class &m, mpz_class &c, unsigned int &interactio
 }
 
 // gets the i-th byte of a byte string
-unsigned char get_byte(mpz_class byte_string, int i)
+unsigned char get_byte(mpz_class &byte_string, int i)
 {
     // (15 - i)*8  -> Big Endian
     //        i*8  -> Little Endian
@@ -274,26 +274,69 @@ unsigned char get_byte(mpz_class byte_string, int i)
     return byte & 0xFF;
 }
 
-// MixColumnsInverse
-vector<unsigned char> MixColumnsInverse(vector<unsigned char> b)
+unsigned char ComputeFPrime(unsigned char* c, unsigned char* c_prime, vector<unsigned char> &r, vector<unsigned char> &k)
 {
-    // a_0 = 14b_0 + 11b_1 + 13b_2 +  9b_3
-    // a_1 =  9b_0 + 14b_1 + 11b_2 + 13b_3
-    // a_2 = 13b_0 +  9b_1 + 14b_2 + 11b_3
-    // a_3 = 11b_0 + 13b_1 +  9b_2 + 14b_3
-    vector<unsigned char> a(4);
-    a[0] = galois_14[b[0]] ^ galois_11[b[1]] ^ galois_13[b[2]] ^  galois_9[b[3]];
-    a[1] =  galois_9[b[0]] ^ galois_14[b[1]] ^ galois_11[b[2]] ^ galois_13[b[3]];
-    a[2] = galois_13[b[0]] ^  galois_9[b[1]] ^ galois_14[b[2]] ^ galois_11[b[3]];
-    a[3] = galois_11[b[0]] ^ galois_13[b[1]] ^  galois_9[b[2]] ^ galois_14[b[3]];
-    
-    return a;
+    unsigned char A = SubBytesInverse[
+                        galois_9[SubBytesInverse[c[12]^k[12]] ^ r[12]] ^
+                       galois_14[SubBytesInverse[c[9] ^k[9] ] ^ r[13]] ^
+                       galois_11[SubBytesInverse[c[6] ^k[6] ] ^ r[14]] ^
+                       galois_13[SubBytesInverse[c[3] ^k[3] ] ^ r[15]] ];
+    unsigned char B = SubBytesInverse[
+                        galois_9[SubBytesInverse[c_prime[12]^k[12]] ^ r[12]] ^
+                       galois_14[SubBytesInverse[c_prime[9] ^k[9] ] ^ r[13]] ^
+                       galois_11[SubBytesInverse[c_prime[6] ^k[6] ] ^ r[14]] ^
+                       galois_13[SubBytesInverse[c_prime[3] ^k[3] ] ^ r[15]] ];
+    return (A ^ B);
+}
+
+unsigned char ComputeFPrime2(unsigned char* c, unsigned char* c_prime, vector<unsigned char> &r, vector<unsigned char> &k)
+{
+    unsigned char A = SubBytesInverse[
+                        galois_9[SubBytesInverse[c[7] ^k[7] ] ^ r[3]] ^
+                       galois_14[SubBytesInverse[c[0] ^k[0] ] ^ r[0]] ^
+                       galois_11[SubBytesInverse[c[13]^k[13]] ^ r[1]] ^
+                       galois_13[SubBytesInverse[c[10]^k[10]] ^ r[2]] ];
+    unsigned char B = SubBytesInverse[
+                        galois_9[SubBytesInverse[c_prime[7] ^k[7] ] ^ r[3]] ^
+                       galois_14[SubBytesInverse[c_prime[0] ^k[0] ] ^ r[0]] ^
+                       galois_11[SubBytesInverse[c_prime[13]^k[13]] ^ r[1]] ^
+                       galois_13[SubBytesInverse[c_prime[10]^k[10]] ^ r[2]] ];
+    return (A ^ B);
+}
+
+unsigned char ComputeFPrime1(unsigned char* c, unsigned char* c_prime, vector<unsigned char> &r, vector<unsigned char> &k)
+{
+    unsigned char A = SubBytesInverse[
+                        galois_9[SubBytesInverse[c[5] ^k[5] ] ^  r[9]] ^
+                       galois_14[SubBytesInverse[c[2] ^k[2] ] ^ r[10]] ^
+                       galois_11[SubBytesInverse[c[15]^k[15]] ^ r[11]] ^
+                       galois_13[SubBytesInverse[c[8] ^k[8] ] ^  r[8]] ];
+    unsigned char B = SubBytesInverse[
+                        galois_9[SubBytesInverse[c_prime[5] ^k[5] ] ^  r[9]] ^
+                       galois_14[SubBytesInverse[c_prime[2] ^k[2] ] ^ r[10]] ^
+                       galois_11[SubBytesInverse[c_prime[15]^k[15]] ^ r[11]] ^
+                       galois_13[SubBytesInverse[c_prime[8] ^k[8] ] ^  r[8]] ];
+    return (A ^ B);
+}
+
+unsigned char ComputeFPrime3(unsigned char* c, unsigned char* c_prime, vector<unsigned char> &r, vector<unsigned char> &k)
+{
+    unsigned char A = SubBytesInverse[
+                        galois_9[SubBytesInverse[c[14]^k[14]] ^ r[6]] ^
+                       galois_14[SubBytesInverse[c[11]^k[11]] ^ r[7]] ^
+                       galois_11[SubBytesInverse[c[4] ^k[4] ] ^ r[4]] ^
+                       galois_13[SubBytesInverse[c[1] ^k[1] ] ^ r[5]] ];    
+    unsigned char B = SubBytesInverse[
+                        galois_9[SubBytesInverse[c_prime[14]^k[14]] ^ r[6]] ^
+                       galois_14[SubBytesInverse[c_prime[11]^k[11]] ^ r[7]] ^
+                       galois_11[SubBytesInverse[c_prime[4] ^k[4] ] ^ r[4]] ^
+                       galois_13[SubBytesInverse[c_prime[1] ^k[1] ] ^ r[5]] ];
+    return (A ^ B);
 }
 
 void KeyInv(unsigned char* r, const unsigned char* k, int round) 
 {
     unsigned char round_char = rcon[round];
-
 
     r[15] = k[15] ^ k[11];
     r[14] = k[14] ^ k[10];
@@ -400,12 +443,13 @@ void attack(char* argv2)
     vector< vector <unsigned char> > k_hypotheses;
     
     //holder for the byte array
-    unsigned char m_char[16] = {0}, c_char[16] = {0};
+    unsigned char m_char[16] = {0}, c_char[16] = {0}, c_prime_char[16] = {0};
     
     // convert m_min from mpz_class to a byte array
     // have the behaviour of I2OSP
     mpz_export(m_char, NULL, 1, 1, 0, 0, m.get_mpz_t());
     mpz_export(c_char, NULL, 1, 1, 0, 0, c.get_mpz_t());
+    mpz_export(c_prime_char, NULL, 1, 1, 0, 0, c_prime.get_mpz_t());
     
     #pragma omp parallel for
     for (int i_10 = 0 ; i_10 < k_10.size(); i_10++ )
@@ -447,9 +491,24 @@ void attack(char* argv2)
                                                                     key[14] = byte_14;
                                                                     key[15] = byte_15;
                                                                     
+                                                                    vector<unsigned char> inv_key(16);
+                                                                    
+                                                                    KeyInv(inv_key.data(), key.data(), 10);
+                                                                    
+                                                                    //*
+                                                                    unsigned char f_prime = ComputeFPrime(c_char, c_prime_char, inv_key, key);
+                                                                    if (f_prime != ComputeFPrime1(c_char, c_prime_char, inv_key, key))
+                                                                        continue;
+                                                                    if (galois_3[f_prime] != ComputeFPrime3(c_char, c_prime_char, inv_key, key))
+                                                                        continue;
+                                                                    if (galois_2[f_prime] != ComputeFPrime2(c_char, c_prime_char, inv_key, key))
+                                                                        continue;
+                                                                    cout << '.' << flush;
+                                                                    //*/
+                                                                    
                                                                     for (int j = 10; j > 0; j--)
                                                                         KeyInv(key.data(), key.data(), j);
-                                                                    
+
                                                                     unsigned char t[16];
         
                                                                     AES_KEY rk;
@@ -464,13 +523,7 @@ void attack(char* argv2)
                                                                         
                                                                         cout << "\nNumber of interactions with the target: " << interaction_number << "\n\n";
                                                                         exit(0);
-                                                                    }
-                                                                    else
-                                                                    {
-                                                                        /*printf("\nAES.Enc( k, m ) != c\n");
-                                                                        for (int i = 0; i < 16; i++)
-                                                                            printf("%02X", key[i]);*/
-                                                                    }
+                                                                    }   
                                                                 }
     }
 }
