@@ -158,15 +158,15 @@ float mean(vector<int> trace)
 // Pearson's correlation coefficient
 float corrcoef(vector<int> x, vector<int> y)
 {
-    // initialise: sum_xy is at the top, the other two - at the bottom
-    float sum_xy = 0, sum_x = 0, sum_y = 0;
+    // initialise: cov_xy is at the top, the other two - at the bottom
+    float cov_xy = 0, sum_x = 0, sum_y = 0;
     
     // precompute for efficiency
     float mean_x = mean(x);
     float mean_y = mean(y);
     
     for (int i = 0; i < x.size(); i++)
-        sum_xy += (x[i] - mean_x)*(y[i] - mean_y);
+        cov_xy += (x[i] - mean_x)*(y[i] - mean_y);
     
     for (int i = 0; i < x.size(); i++)
         sum_x += (x[i] - mean_x)*(x[i] - mean_x);    
@@ -174,7 +174,7 @@ float corrcoef(vector<int> x, vector<int> y)
     for (int i = 0; i < y.size(); i++)
         sum_y += (y[i] - mean_y)*(y[i] - mean_y);
     
-    return (float) sum_xy/(sqrt(sum_x)*sqrt(sum_y));
+    return (float) cov_xy/(sqrt(sum_x)*sqrt(sum_y));
 }
 
 void attack(char* argv2)
@@ -186,7 +186,7 @@ void attack(char* argv2)
     mpz_class c, m;
     vector<int> current_power;
     vector<mpz_class> messages;
-    int oracle_queries = 13;
+    int oracle_queries = 15;
     
     // produce random messages
     gmp_randclass randomness(gmp_randinit_default);
@@ -194,6 +194,7 @@ void attack(char* argv2)
     // a 2D matrix of traces/powers
     vector< vector<int> > powers;
     
+    RESAMPLE:
     // initial sample set and respective power traces
     for (int j = 0; j < oracle_queries; j++)
     {
@@ -206,12 +207,13 @@ void attack(char* argv2)
         powers.push_back(current_power);   
     }
 
+    // find the smallest by size power
     int min = powers[0].size();
     for (int j = 1; j < powers.size(); j++)
         if (powers[j].size() < min)
             min = powers[j].size();
     
-    vector< vector<int> > powers_T(min, vector<int> (powers.size()));   //the 'transposed' vector
+    vector< vector<int> > powers_T(min, vector<int> (powers.size()));   //the 'transposed' matrix
     for (int j = 0; j < min; j++)  
         for (int l = 0; l < powers.size(); l++)
 	        powers_T[j][l] = powers[l][j];
@@ -220,12 +222,15 @@ void attack(char* argv2)
    
     // recover 1 byte of the key at the time: 
     // 1 byte of the key corresponds to 1 byte of the message in AES
+    // there are 256 possible values for this byte
     #pragma omp parallel for
     for (int n = 0; n < 16; n++)
     {
+        // simulated power traces
         vector< vector<int> > target   (messages.size(), vector<int> (256));
         vector< vector<int> > target_T (256, vector<int> (messages.size()));
 
+        // power traces of the same messages simulation
         for (int j = 0; j < messages.size(); j++)
         {
             mpz_class temp = messages[j] >> (8*n);
@@ -241,9 +246,9 @@ void attack(char* argv2)
             for (int l = 0; l < target.size(); l++)
                 target_T[j][l] = target[l][j];
         
+        // compute a matrix of all correlation coefficients of target and powers
         vector< vector<float> > corr_mat (256, vector<float> (powers_T.size()));
         for (int j = 0; j < 256; j++)
-        {
             for (int l = 0; l < powers_T.size(); l++)
             {
                 if (powers_T[l].size() != target_T[j].size())
@@ -251,30 +256,26 @@ void attack(char* argv2)
                 
                 corr_mat[j][l] = corrcoef(target_T[j], powers_T[l]);
             }
-        }
         
+        // find the best correlation and the respective byte value
         float max_abs = -2;
         int max_j = -1;
         for (int j = 0; j < 256; j++)
-        {
             for (int l = 0; l < powers_T.size(); l++)
-            {
                 if(abs(corr_mat[j][l]) > max_abs)
                 {
                     max_abs = abs(corr_mat[j][l]);
                     max_j = j;
                 }
-            }
-        }
         
         key[n] = max_j;
     }
     
-    cout << "\nRecovered key: ";
+    cout << "\nSuggested Key: ";
     for (int n = 15; n >= 0; n--)
         printf("%02X", key[n]);
     
-    cout << "\nKey check:\n";
+    cout << "\nKey check:";
     std::reverse(begin(key), end(key));
     
     unsigned char t[16];
@@ -294,7 +295,12 @@ void attack(char* argv2)
     if(!memcmp(t, c_char, 16))
         printf("\nAES.Enc( k, m ) == c\n");
     else
+    {
         printf("\nAES.Enc( k, m ) != c\n");
+        printf("RESAMPLING\n");
+        oracle_queries = 5;
+        goto RESAMPLE;
+    }
     
     cout << "\nNumber of interactions with the target: " << interaction_number << "\n\n";
 
