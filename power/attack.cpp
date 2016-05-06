@@ -153,7 +153,6 @@ float mean(vector<int> trace)
     return (float) sum/trace.size();
 }
 
-// http://www.alglib.net/statistics/correlation.php
 // Pearson Product-Moment Correlation a.k.a. 
 // Pearson's correlation coefficient
 float corrcoef(vector<int> x, vector<int> y)
@@ -186,7 +185,7 @@ void attack(char* argv2)
     mpz_class c, m;
     vector<int> current_power;
     vector<mpz_class> messages;
-    int oracle_queries = 15;
+    int oracle_queries = 10;
     
     // produce random messages
     gmp_randclass randomness(gmp_randinit_default);
@@ -283,7 +282,7 @@ void attack(char* argv2)
     //holder for the byte array
     unsigned char m_char[16] = {0}, c_char[16] = {0};
     
-    // convert m_min from mpz_class to a byte array
+    // convert m and c from mpz_class to a byte array
     // have the behaviour of I2OSP
     mpz_export(m_char, NULL, 1, 1, 0, 0, m.get_mpz_t());
     mpz_export(c_char, NULL, 1, 1, 0, 0, c.get_mpz_t());

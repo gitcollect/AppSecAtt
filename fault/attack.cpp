@@ -334,6 +334,7 @@ unsigned char ComputeFPrime3(unsigned char* c, unsigned char* c_prime, vector<un
     return (A ^ B);
 }
 
+// AES Key Inverse
 void KeyInv(unsigned char* r, const unsigned char* k, int round) 
 {
     unsigned char round_char = rcon[round];
@@ -359,17 +360,27 @@ void KeyInv(unsigned char* r, const unsigned char* k, int round)
     r[0]  = SubBytes[r[13]] ^ k[0] ^ round_char;    
 }
 
-void equations(mpz_class &c, mpz_class &c_prime, vector<unsigned char> &k, vector< vector <unsigned char> > &k_1, 
-                vector< vector <unsigned char> > &k_2, vector< vector <unsigned char> > &k_3, int i_0, int i_1, int i_2, int i_3)
+// first step of the fault attack
+// solves one system of equations
+void equations(mpz_class &c, mpz_class &c_prime, 
+                vector<unsigned char> &k, 
+                vector< vector <unsigned char> > &k_1, 
+                vector< vector <unsigned char> > &k_2, 
+                vector< vector <unsigned char> > &k_3, 
+                int i_0, int i_1, int i_2, int i_3)
 {
     for (int i = 0; i < 256; i++)
     {
+        // a hypothesis for the current key byte
         unsigned char k_i_0 = i;
         
+        // compute initial value of delta, then check if the remaining 3 equations hold
+        // computed for 1st, 3rd, 8th and 10th key byte
         unsigned char delta = (SubBytesInverse[get_byte(c, i_0)^k_i_0] ^ SubBytesInverse[get_byte(c_prime, i_0)^k_i_0]);
         
         vector <unsigned char> k_i_1_vect, k_i_2_vect, k_i_3_vect;
         
+        // computed for 13th, 4th, 15th and 6th key byte
         for (int j = 0; j < 256; j++)
         {
             unsigned char k_i_1 = j;
@@ -380,6 +391,7 @@ void equations(mpz_class &c, mpz_class &c_prime, vector<unsigned char> &k, vecto
         if (k_i_1_vect.empty())
             continue;
         
+        // computed for 0th, 11th, 2nd and 9th key byte
         for (int j = 0; j < 256; j++)
         {
             unsigned char k_i_2 = j;
@@ -390,6 +402,7 @@ void equations(mpz_class &c, mpz_class &c_prime, vector<unsigned char> &k, vecto
         if (k_i_2_vect.empty())
             continue;
         
+        // computed for 7th, 14th, 5th and 12th key byte
         for (int j = 0; j < 256; j++)
         {
             unsigned char k_i_3 = j;
@@ -400,7 +413,7 @@ void equations(mpz_class &c, mpz_class &c_prime, vector<unsigned char> &k, vecto
         if (k_i_3_vect.empty())
             continue;
         
-        //cout << "End of equations\n";
+        // if the system of equations holds, save the key hypotheses
         k.push_back(k_i_0);
         k_1.push_back(k_i_1_vect);
         k_2.push_back(k_i_2_vect);
@@ -429,12 +442,26 @@ void attack(char* argv2)
     cout << "c       = " << hex << c << "\n";
     cout << "c_prime = " << hex << c_prime << "\n";
     
-            vector <unsigned char>   k_10,  k_1,  k_8, k_3;
+    // vectors of hypotheses for 1st, 3rd, 8th and 10th key byte
+    vector <unsigned char> k_10, k_1, k_8, k_3;
+    
+    // vectors of hypotheses for key 0th, 7th and 13th key byte
+    // for each hypothesis for key byte 10
     vector< vector <unsigned char> > k_13,  k_0,  k_7;
+    
+    // vectors of hypotheses for key 4th, 11th and 14th key byte
+    // for each hypothesis for key byte 1
     vector< vector <unsigned char> >  k_4, k_11, k_14;
+    
+    // vectors of hypotheses for key 2nd, 4th and 15th key byte
+    // for each hypothesis for key byte 8
     vector< vector <unsigned char> > k_15,  k_2,  k_5;
+    
+    // vectors of hypotheses for key 6th, 9th and 12th key byte
+    // for each hypothesis for key byte 3
     vector< vector <unsigned char> >  k_6,  k_9, k_12;
     
+    // compute the first step system of equations for every case outlined above
     equations(c, c_prime, k_10, k_13,  k_0,  k_7, 10, 13,  0,  7);
     equations(c, c_prime,  k_1,  k_4, k_11, k_14,  1,  4, 11, 14);
     equations(c, c_prime,  k_8, k_15,  k_2,  k_5,  8, 15,  2,  5);
@@ -445,35 +472,36 @@ void attack(char* argv2)
     //holder for the byte array
     unsigned char m_char[16] = {0}, c_char[16] = {0}, c_prime_char[16] = {0};
     
-    // convert m_min from mpz_class to a byte array
+    // convert m, c and c_prime from mpz_class to a byte array
     // have the behaviour of I2OSP
     mpz_export(m_char, NULL, 1, 1, 0, 0, m.get_mpz_t());
     mpz_export(c_char, NULL, 1, 1, 0, 0, c.get_mpz_t());
     mpz_export(c_prime_char, NULL, 1, 1, 0, 0, c_prime.get_mpz_t());
     
     #pragma omp parallel for
-    for (int i_10 = 0 ; i_10 < k_10.size(); i_10++ )
+    for (int i_10 = 0 ; i_10 < k_10.size(); i_10++ )   // each hypothesis for 10th key byte
     {
         vector<unsigned char> key(16);
-        for (unsigned char byte_13 : k_13[i_10])
-            for (unsigned char byte_0 : k_0[i_10])
-                for (unsigned char byte_7 : k_7[i_10])
+        for (unsigned char byte_13 : k_13[i_10])       // each respective hypothesis for 13th key byte
+            for (unsigned char byte_0 : k_0[i_10])     // each respective hypothesis for  0th key byte
+                for (unsigned char byte_7 : k_7[i_10]) // each respective hypothesis for  7th key byte
                     
-                    for (int i_1 = 0 ; i_1 < k_1.size(); i_1++ )
-                        for (unsigned char byte_4 : k_4[i_1])
-                            for (unsigned char byte_11 : k_11[i_1])
-                                for (unsigned char byte_14 : k_14[i_1])
+                    for (int i_1 = 0 ; i_1 < k_1.size(); i_1++ )       // each hypothesis for 1st key byte
+                        for (unsigned char byte_4 : k_4[i_1])          // each respective hypothesis for  4th key byte
+                            for (unsigned char byte_11 : k_11[i_1])    // each respective hypothesis for 11th key byte
+                                for (unsigned char byte_14 : k_14[i_1])// each respective hypothesis for 14th key byte
                                     
-                                    for (int i_8 = 0; i_8 < k_8.size(); i_8++ )
-                                        for (unsigned char byte_15 : k_15[i_8])
-                                            for (unsigned char byte_2 : k_2[i_8])
-                                                for (unsigned char byte_5 : k_5[i_8])
+                                    for (int i_8 = 0; i_8 < k_8.size(); i_8++ )      // each hypothesis for 8th key byte
+                                        for (unsigned char byte_15 : k_15[i_8])      // each respective hypothesis for 15th key byte
+                                            for (unsigned char byte_2 : k_2[i_8])    // each respective hypothesis for  2nd key byte
+                                                for (unsigned char byte_5 : k_5[i_8])// each respective hypothesis for  5th key byte
                                                     
-                                                    for (int i_3 = 0; i_3 < k_3.size(); i_3++ )
-                                                        for (unsigned char byte_6 : k_6[i_3])
-                                                            for (unsigned char byte_9 : k_9[i_3])
-                                                                for (unsigned char byte_12 : k_12[i_3])
+                                                    for (int i_3 = 0; i_3 < k_3.size(); i_3++ )        // each hypothesis for 3rd key byte
+                                                        for (unsigned char byte_6 : k_6[i_3])          // each respective hypothesis for  6th key byte
+                                                            for (unsigned char byte_9 : k_9[i_3])      // each respective hypothesis for  9th key byte
+                                                                for (unsigned char byte_12 : k_12[i_3])// each respective hypothesis for 12th key byte
                                                                 {
+                                                                    // 'assemble' the hypothetical key
                                                                     key[0] = byte_0;
                                                                     key[1] = k_1[i_1];
                                                                     key[2] = byte_2;
@@ -493,9 +521,10 @@ void attack(char* argv2)
                                                                     
                                                                     vector<unsigned char> inv_key(16);
                                                                     
+                                                                    // inverse the hypothetical key: to get 9th round key
                                                                     KeyInv(inv_key.data(), key.data(), 10);
                                                                     
-                                                                    //*
+                                                                    // second step of the attack
                                                                     unsigned char f_prime = ComputeFPrime(c_char, c_prime_char, inv_key, key);
                                                                     if (f_prime != ComputeFPrime1(c_char, c_prime_char, inv_key, key))
                                                                         continue;
@@ -504,11 +533,12 @@ void attack(char* argv2)
                                                                     if (galois_2[f_prime] != ComputeFPrime2(c_char, c_prime_char, inv_key, key))
                                                                         continue;
                                                                     cout << '.' << flush;
-                                                                    //*/
                                                                     
+                                                                    // get the AES key from the 10th round key
                                                                     for (int j = 10; j > 0; j--)
                                                                         KeyInv(key.data(), key.data(), j);
-
+                                                                    
+                                                                    // verification step
                                                                     unsigned char t[16];
         
                                                                     AES_KEY rk;
@@ -526,6 +556,8 @@ void attack(char* argv2)
                                                                     }   
                                                                 }
     }
+    
+    cout << "Attack has failed\n";
 }
 
 

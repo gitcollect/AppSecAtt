@@ -4,12 +4,23 @@ Q.1 As a security consultant, you have been working on a prototype of the
     attack.  Explain the options available, and which one you would
     recommend.
     
-    Blinding
-    Adding noise
-    Adding redundant code
-    
-    Masking
-    Hiding
+    A countermeasure to a power attack could aim to remove any dependency
+    between processed intermediate values (performed operations) and power
+    consumption. 
+    This could be achieved by masking - applying a reversible
+    transformation to the intermediate values, so that no information about
+    the power consumption is available. Thus, only randomized values are
+    processed and the power required for this is independent of the actual
+    intermediate values. Masking does not require changing the power
+    consumption characteristics of the device.
+    Alternatively, one could choose hiding - making the power consumption 
+    look random or be constant. To achieve the former a combination of:
+    dummy operation random insertion and operations shuffling can be 
+    implemented. To achieve the latter, the SNR could be reduced - ideally
+    SNR = 0. This could be achieved by using one or both of signal decrease
+    and noise increase.
+    As masking is a software alteration and does not require hardware changes
+    (which could be expensive), it would be my recommendation. 
     
 Q.2 Your implementation of this attack will target some operation during
     execution of AES.  Identify which operation you target, and explain
@@ -42,7 +53,7 @@ Q.5 DPA attacks work because statistics can (to some degree) remove the
     Therefore, the signal-to-noise ratio SNR = Var(P_exp)/Var(P_noise).
     The more noise there is, the more power traces are needed for the attack
     to be executed. More specifically, the relation between signal and noise
-    is quadratic: if we double the noise, 4 times more traces will need to 
+    is quadratic: if we double the noise, 4 times as many traces will need to 
     be measured.
     
 Q.6 DPA attacks include a statistical analysis step, for which one option
@@ -50,3 +61,14 @@ Q.6 DPA attacks include a statistical analysis step, for which one option
     t-test and Kocher's method is.  Given that in a DPA attack one might
     have unequal sets of measurements associated with 0 and 1, is a
     standard t-test actually an appropriate choice?
+    
+    Unlike Kocher's method (which uses the product moment correlation
+    coefficient, and hence, the covariance between the simulated and real 
+    power trace), standard t-tests use the difference of means of the two
+    sets. In the case of the power attack, one of the sets is the Hamming 
+    weight which is the simulated power trace, and the other set is the 
+    real power trace. As the probability of a bit being 1 (or 0) is 1/2,
+    it is likely that the mean of the Hamming weights will evaluate to 4.
+    Hence, the t-test will evaluate to the same value for different key 
+    hypotheses, meaning it is not an appropriate choice of a statistical
+    model (distinguisher).
